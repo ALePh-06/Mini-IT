@@ -2,4 +2,4 @@ Adam wakes up in the morning.
 He brushes his teeth.
 He has breakfast.
 Then he . . .
-hen he checked Instagram
+hen he checked github
