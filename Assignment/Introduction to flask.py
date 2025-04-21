@@ -3,7 +3,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return render_template("Index.html")
+    return render_template(".html")
 
 @app.route('/Login')
 def index():
