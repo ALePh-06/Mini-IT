@@ -12,6 +12,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     lecturer = Column(Boolean, nullable=False, default=False)
     name = Column(String, nullable=False)
+    email = Column(String, nullable=False)
 
     # Add relationship from the User side to access all comments
     comments = relationship('Comment', back_populates='user')
@@ -36,7 +37,7 @@ class Team(Base):
     student_id = Column(Integer, ForeignKey('users.id'), nullable=False)
 
     # Define relationship
-    student_name = relationship('User', foreign_keys=id)
+    student_name = relationship('User', foreign_keys=[student_id])
 
 # Define Submission table
 class Submission(Base):
@@ -131,3 +132,9 @@ engine = create_engine('sqlite:///mydatabase.db')
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
+
+session.add_all([
+    User(lecturer=False, name='Ah Chong'),
+    User(lecturer=True, name='Vin Diesel'),
+
+])
