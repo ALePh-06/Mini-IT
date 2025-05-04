@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, DateTime, Boolean, event, Enum
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, DateTime, Boolean, event, Enum, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.inspection import inspect
@@ -23,8 +23,8 @@ class User(Base):
 # Define Lecturer table
 class Lecturer(Base):
     __tablename__ = 'lecturers'
-    id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    lecturer_id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(Integer, ForeignKey('users.id'), primary_key=True, nullable=False)
+    lecturer_id = Column(Integer, autoincrement=True)
 
     # Relationship back to User
     user = relationship('User', back_populates='lecturer_details')
@@ -41,6 +41,31 @@ class Team(Base):
     comments = relationship('Comment', backref='team')
     submissions = relationship('Submission', backref='team')
 
+class SubmissionTemplate(Base):
+    __tablename__ = 'submission_templates'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    lecturer_id = Column(Integer, ForeignKey('lecturers.lecturer_id'), nullable=False)
+    team_id = Column(String, ForeignKey('teams.team_id'), nullable=False)
+    field_name = Column(String, nullable=False) 
+    field_order = Column(Integer, nullable=False)  # For sorting
+
+class SubmissionField(Base):
+    __tablename__ = 'submission_fields'
+    id = Column(Integer, primary_key=True)
+    submission_id = Column(Integer, ForeignKey('submissions.id'), nullable=False)
+    field_name = Column(String, nullable=False)  # Should match a template field
+    field_value = Column(String, nullable=False)
+
+    submission = relationship('Submission', back_populates='fields')
+
+''' How to use Submission template, eg: Create template for team T001
+fields = ['Project Title', 'Objective', 'Tools', 'Timeline']
+
+for i, name in enumerate(fields):
+    session.add(SubmissionTemplate(team_id='T001', lecturer_id=1, field_name=name, field_order=i))
+
+session.commit()'''
+
 # Define Submission table
 class Submission(Base):
     __tablename__ = 'submissions'
@@ -49,39 +74,36 @@ class Submission(Base):
     lecturer_id = Column(Integer, ForeignKey('teams.lecturer_id'), nullable=False)
     time = Column(DateTime, nullable=False, default=datetime.now)
     title = Column(String, nullable=False)
-    field1 = Column(String, nullable=False)
-    field2 = Column(String) 
-    field3 = Column(String) 
-    field4 = Column(String) 
-    field5 = Column(String) 
-    field6 = Column(String) 
-    field7 = Column(String) 
-    field8 = Column(String) 
-    field9 = Column(String) 
 
     # Define relationship to history
+    fields = relationship('SubmissionField', back_populates='submission')
     histories = relationship('History', back_populates='submission')
 
+''' How student data will be entered into the database 
+submission = Submission(team_id='T001', lecturer_id=1, title="Smart Garden")
+
+# Assume this came from a form
+field_inputs = {
+    'Project Title': "Smart Garden",
+    'Objective': "Automated watering system",
+    'Tools': "Raspberry Pi, sensors",
+    'Timeline': "Week 1: Setup, Week 2: Testing"
+}
+
+for field_name, value in field_inputs.items():
+    submission.fields.append(SubmissionField(field_name=field_name, field_value=value))
+
+session.add(submission)
+session.commit()'''
+
 # Define Submission History table
-class History(Base):
-    __tablename__ = 'history'
-    id = Column(Integer, primary_key=True, unique=True, autoincrement=True)
-    submission_id = Column(Integer, ForeignKey('submissions.id'), nullable=False)
-    team_id = Column(String, nullable=False)
-    lecturer_id = Column(Integer, nullable=False)
-    time = Column(DateTime, nullable=False)
-    title = Column(String, nullable=False)
-    field1 = Column(String, nullable=False)
-    field2 = Column(String)
-    field3 = Column(String)
-    field4 = Column(String)
-    field5 = Column(String)
-    field6 = Column(String)
-    field7 = Column(String)
-    field8 = Column(String)
-    field9 = Column(String)
-    # Define relationship to submission
-    submission = relationship('Submission', back_populates='histories')
+class SubmissionHistory(Base):
+    __tablename__ = 'submission_history'
+    id = Column(Integer, primary_key=True)
+    submission_id = Column(Integer, ForeignKey('submissions.id'))
+    time = Column(DateTime, default=datetime.now)
+    field_name = Column(String, nullable=False)
+    field_value = Column(String, nullable=False)
 
 # Define Approval Status table
 class Status(Base):
@@ -114,32 +136,9 @@ def create_lecturer_entry(mapper, connection, target):
             Lecturer.__table__.insert().values(id=target.id)
         )
 
-def create_submission_snapshot(submission):
-    snapshot_data = {}
-    mapper = inspect(History)
-
-    # Loop through History's column names
-    for column in mapper.attrs:
-        col_name = column.key
-        
-        # Copy fields if they exist in Submission
-        if hasattr(submission, col_name):
-            snapshot_data[col_name] = getattr(submission, col_name)
-    
-    # Set submission_id manually (if not set yet)
-    snapshot_data['submission_id'] = submission.id
-
-    return History(**snapshot_data)
-
 # Initialize DB connection
 engine = create_engine('sqlite:///mydatabase.db')
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
-
-session.add_all([
-    User(lecturer=False, name='Ah Chong'),
-    User(lecturer=True, name='Vin Diesel'),
-
-])
 
