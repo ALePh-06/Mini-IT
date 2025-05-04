@@ -1,0 +1,46 @@
+*
+
+{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Roboto';
+}
+
+body
+{
+    background-color: rgb(212, 212, 185);
+}
+
+header
+{
+  background: gray;
+  padding: 0;
+  opacity: 50%;
+  display: flex;
+}
+
+ul
+{
+    margin: 0;
+    padding: 0;
+    list-style-type: none;
+}
+
+li
+{
+    display: inline-block;
+    margin-right: 50px;
+}
+
+@font-face {
+    font-family: 'Roboto';
+    src: url("Roboto/static/Roboto-Medium.ttf");
+
+}
+
+button
+{
+    margin: 20px;
+    padding: 20px;
+}
