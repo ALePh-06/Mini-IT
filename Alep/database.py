@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, DateTime, Boolean, event
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, DateTime, Boolean, event, Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.inspection import inspect
@@ -38,6 +38,8 @@ class Team(Base):
 
     # Define relationship
     student_name = relationship('User', foreign_keys=[student_id])
+    comments = relationship('Comment', backref='team')
+    submissions = relationship('Submission', backref='team')
 
 # Define Submission table
 class Submission(Base):
@@ -85,20 +87,22 @@ class History(Base):
 class Status(Base):
     __tablename__ = 'status'
     id = Column(Integer, ForeignKey('submissions.id'), nullable=False, primary_key=True)
-    team_id = Column(Integer, ForeignKey('submissions.team_id'), nullable=False)
+    team_id = Column(String, ForeignKey('submissions.team_id'), nullable=False)
     lecturer_id = Column(Integer, ForeignKey('submissions.lecturer_id'), nullable=False)
-    status = Column(String, default="pending")
+    status = Column(Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
 
 # Define Comment
 class Comment(Base):
     __tablename__ = 'comments'
     id = Column(Integer, unique=True, autoincrement=True, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    team_id = Column(String, ForeignKey('teams.team_id'), nullable=False)
     time = Column(DateTime, default=datetime.now)
     message = Column(String, nullable=False)
 
     # Set relationship to user so that user name will show up
     user = relationship('User', foreign_keys=[user_id], back_populates='comments')
+    team = relationship('Team') 
 
 # Event listener for automatically creating a Lecturer entry after a User insert
 @event.listens_for(User, 'after_insert')
@@ -138,3 +142,4 @@ session.add_all([
     User(lecturer=True, name='Vin Diesel'),
 
 ])
+
