@@ -5,7 +5,7 @@
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link rel="stylesheet" href="Styles.css">
+        <link rel="stylesheet" href="{{ url_for('static', filename='Styles.css') }}"> <!-- Link to CSS in static folder -->
     </head>
 
     <body>
@@ -26,12 +26,12 @@
 
                     <div class="input-A">
                         <input type="submit" id="LoginButton" value="Login">
-                        <script src="Script.js"></script>
+                        <script src="{{ url_for('static', filename='Script.js') }}"></script> <!-- Link to JS in static folder -->
                     </div>
 
                     <div class="links">
                         <a href="#">Forget Password</a>
-                        <a href="Signup.html">Sign up</a>
+                        <a href="/Signup">Sign up</a>
                     </div>
             </div>
         </div>
