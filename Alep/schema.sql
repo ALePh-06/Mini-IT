@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS courses;
+
+CREATE TABLE courses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created TIMESTAMP NOT NULL DEFAULT (DATETIME('now', '+8 hours')),
+    title TEXT NOT NULL,
+    code TEXT NOT NULL,
+    content TEXT NOT NULL
+);
