@@ -30,29 +30,57 @@ def course(course_id):
     course = get_course(course_id)
     return render_template('course.html', course = course)
 
-@app.route('/create', methods=('GET', 'COURSE'))
-def create():
-    if request.method == 'COURSE':
+@app.route('/create_course', methods=('GET', 'POST'))
+def create_course():
+    if request.method == 'POST':
         title = request.form['title']
+        trimester = request.form['trimester']
+        code = request.form['code']
         content = request.form['content']
 
         if not title:
             flash('Title is required!')
+        elif not trimester:
+            flash('Trimester is required!')
+        elif not code:
+            flash('Code is required!')
         else:
             conn = get_db_connection()
-            conn.execute('INSERT INTO courses (title, content) VALUES (?, ?)',
-                         (title, content))
+            conn.execute('INSERT INTO courses (title, trimester, code, content) VALUES (?, ?, ?, ?)',
+                         (title, trimester, code, content))
             conn.commit()
             conn.close()
             return redirect(url_for('index'))
 
-    return render_template('create.html')
+    return render_template('create_course.html')
 
-@app.route('/<int:id>/edit', methods=('GET', 'course'))
+@app.route('/create_template', methods=('GET', 'POST'))
+def create_template():
+    if request.method == 'POST':
+        template_name = request.form['name']
+        field_names = request.form.getlist['field_name']
+
+        if not template_name:
+            flash('Name of template is required!')
+        elif not field_names or all(f.strip() == '' for f in field_names):
+            flash('At least one field name is required!')
+        else:
+            conn = get_db_connection()
+            for i, fname in enumerate(field_names):
+                if fname.strip():  # skip empty field names
+                    conn.execute('INSERT INTO templates (name, field_name, field_order) VALUES (?, ?, ?)',
+                                 (template_name, fname.strip(), i))
+                    conn.commit()
+                    conn.close()
+            return redirect(url_for('index'))
+
+    return render_template('create_template.html')
+
+@app.route('/<int:id>/edit', methods=('GET', 'POST'))
 def edit(id):
     course = get_course(id)
 
-    if request.method == 'COURSE':
+    if request.method == 'POST':
         title = request.form['title']
         content = request.form['content']
 
@@ -69,7 +97,7 @@ def edit(id):
 
     return render_template('edit.html', course = course)
 
-@app.route('/<int:id>/delete', methods=('COURSE',))
+@app.route('/<int:id>/delete', methods=('POST',))
 def delete(id):
     course = get_course(id)
     conn = get_db_connection()

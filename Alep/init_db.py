@@ -8,16 +8,16 @@ with open('Alep/schema.sql') as f:
 
 cur = connection.cursor()
 
-cur.execute("INSERT INTO courses (title, code, content) VALUES (?, ?, ?)",
-            ('First Course', '123', 'Content for the first course')
+cur.execute("INSERT INTO courses (title, trimester, code, content) VALUES (?, ?, ?, ?)",
+            ('First Course', '1', '123', 'Content for the first course')
             )
 
-cur.execute("INSERT INTO courses (title, code, content) VALUES (?, ?, ?)",
-            ('Second Course', 'ABC', 'Content for the second course')
+cur.execute("INSERT INTO courses (title, trimester, code, content) VALUES (?, ?, ?, ?)",
+            ('Second Course', '2', 'ABC', 'Content for the second course')
             )
 
-cur.execute("INSERT INTO courses (title, code, content) VALUES (?, ?, ?)",
-            ('Nopal got no pull game', 'ABCDE12345^', 'As in the title. This is all riyal. You must believe me')
+cur.execute("INSERT INTO courses (title, trimester, code, content) VALUES (?, ?, ?, ?)",
+            ('Nopal got no pull game', '3', 'ABCDE12345^', 'As in the title. This is all riyal. You must believe me')
             )
 
 

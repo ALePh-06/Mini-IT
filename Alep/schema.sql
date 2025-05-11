@@ -2,8 +2,15 @@ DROP TABLE IF EXISTS courses;
 
 CREATE TABLE courses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    created TIMESTAMP NOT NULL DEFAULT (DATETIME('now', '+8 hours')),
     title TEXT NOT NULL,
+    trimester INTEGER NOT NULL,
     code TEXT NOT NULL,
     content TEXT NOT NULL
+);
+
+CREATE TABLE templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    field_name TEXT NOT NULL,
+    field_order INTEGER NOT NULL
 );
