@@ -18,24 +18,24 @@
                  <h1>Sign Up</h1>
 
                     <div class="input-A">
-                        <input type="text" id="Username" placeholder="Username" required>
+                        <input type="text" id="Username" placeholder="Username" required></input>
                     </div>
 
                     <div class="input-A">
-                        <input type="password" id="password" placeholder="Password" required>
+                        <input type="password" id="password" placeholder="Password" required></input>
                     </div>
 
                     <div class="input-A">
-                        <input type="password" id="ConfirmPassword" placeholder="Confirm Your Password" required>
+                        <input type="password" id="ConfirmPassword" placeholder="Confirm Your Password" required></input>
                     </div>
 
                     <!--Special Key for Lecturers-->
                     <div class="input-A">
-                        <input type="text" id="Special_Key" placeholder="Enter Special_Key (For Lecturers Only)">
+                        <input type="text" id="Special_Key" placeholder="Enter Special_Key (For Lecturers Only)"></input>
                     </div>
 
                     <div class="input-A">
-                        <input type="submit" id="SignUpButton" value="Sign Up">
+                        <button type="submit" class="btn btn-primary">Sign Up</button>
                     </div>
 
                     <div class="links">
@@ -43,5 +43,11 @@
                     </div>
             </div>
         </div>
+        <div class="container">
+      {% for message in get_flashed_messages() %}
+        <div class="alert alert-danger">{{ message }}</div>
+      {% endfor %}
+        {% block content %} {% endblock %}
+    </div>
     </body>
 </html>
