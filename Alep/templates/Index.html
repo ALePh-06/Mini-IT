@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>{% block title %} Welcome to ProjectProposalSystem {% endblock %}</h1>
+    {% for course in courses %}
+        <a href="{{ url_for('course', course_id=course['id']) }}">
+            <h2>{{ course['title'] }}</h2>
+        </a>
+        <span class="badge badge-primary">Trimester : {{ course['trimester'] }}</span>
+        <a href="{{ url_for('edit', id=course['id']) }}">
+            <span class="badge badge-warning">Edit</span>
+        </a>
+        <hr>
+    {% endfor %}
+{% endblock %}
