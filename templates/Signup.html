@@ -5,7 +5,7 @@
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link rel="stylesheet" href="{{ url_for('static', filename='Styles.css') }}"> <!-- Link to CSS in static folder -->
+        <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"> <!-- Link to CSS in static folder -->
     </head>
 
     <body>
@@ -18,15 +18,20 @@
                  <h1>Sign Up</h1>
 
                     <div class="input-A">
-                        <input type="text" id="Username" placeholder="Username">
+                        <input type="text" id="Username" placeholder="Username" required>
                     </div>
 
                     <div class="input-A">
-                        <input type="password" id="password" placeholder="Password">
+                        <input type="password" id="password" placeholder="Password" required>
                     </div>
 
                     <div class="input-A">
-                        <input type="password" id="ConfirmPassword" placeholder="Confirm Your Password">
+                        <input type="password" id="ConfirmPassword" placeholder="Confirm Your Password" required>
+                    </div>
+
+                    <!--Special Key for Lecturers-->
+                    <div class="input-A">
+                        <input type="text" id="Special_Key" placeholder="Enter Special_Key (For Lecturers Only)">
                     </div>
 
                     <div class="input-A">
