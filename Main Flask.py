@@ -21,7 +21,7 @@ def Login():
         username = request.form["username"]
         password = request.form["password"]
 
-        
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT password, user_type FROM users WHERE username=?",  (username,))
         user = cursor.fetchone()
@@ -41,10 +41,10 @@ def Login():
 @app.route('/Signup', methods=("GET", "POST"))
 def signup():
     if request.method == "POST": 
-        username = request.form["Username"]
+        username = request.form["username"]
         password = request.form["password"]
         confirm_password = request.form["ConfirmPassword"]
-        special_key = request.form["Special_Key"]
+        _code = request.form["special_code"]
 
         if password != confirm_password:
             flash('Passwords do not match. Try again.')    

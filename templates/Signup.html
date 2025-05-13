@@ -17,30 +17,32 @@
             <div class="login" id="SignUp">
                  <h1>Sign Up</h1>
 
+                <form method="POST">
                     <div class="input-A">
-                        <input type="text" id="Username" placeholder="Username" required></input>
+                        <input type="text" name="username" id="Username" placeholder="Username" required></input>
                     </div>
 
                     <div class="input-A">
-                        <input type="password" id="password" placeholder="Password" required></input>
+                        <input type="password" name="password" id="password" placeholder="Password" required></input>
                     </div>
 
                     <div class="input-A">
-                        <input type="password" id="ConfirmPassword" placeholder="Confirm Your Password" required></input>
+                        <input type="password" name="ConfirmPassword" id="ConfirmPassword" placeholder="Confirm Your Password" required></input>
                     </div>
 
-                    <!--Special Key for Lecturers-->
-                    <div class="input-A">
-                        <input type="text" id="Special_Key" placeholder="Enter Special_Key (For Lecturers Only)"></input>
+                    <!--Special Code for Lecturers-->
+                    <div class = "input-A">
+                        <input type="text" name="special_code" placeholder="Enter Special Code (Lecturer Only)">
                     </div>
 
                     <div class="input-A">
                         <button type="submit" class="btn btn-primary">Sign Up</button>
                     </div>
+                </form>
 
-                    <div class="links">
-                        <a href="/">Login</a>
-                    </div>
+                <div class="links">
+                    <a href="/">Login</a>
+                </div>
             </div>
         </div>
         <div class="container">
