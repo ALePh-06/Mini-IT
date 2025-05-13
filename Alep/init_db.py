@@ -20,6 +20,9 @@ cur.execute("INSERT INTO courses (title, trimester, code, content) VALUES (?, ?,
             ('Nopal got no pull game', '3', 'ABCDE12345^', 'As in the title. This is all riyal. You must believe me')
             )
 
+cur.execute("INSERT INTO users (username, password) VALUES (?, ?)",
+            ('abu', 'abc123'))
+
 
 connection.commit()
 connection.close()

@@ -74,7 +74,7 @@ def formstudent():
 
 @app.route('/Create_Student_Submission_Form')
 def form():
-    return render_template("Form.html")
+    return render_template("")
 
 app.run(host="0.0.0.0", port=5000, debug=True)
 # This code creates a simple Flask web application that returns when accessed at the root URL.
