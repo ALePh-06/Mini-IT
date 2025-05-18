@@ -1,13 +1,45 @@
 import sqlite3
 # Added render template and more
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-# Putting bcrypt
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.exceptions import abort
+import os
+
+basedir = os.path.abspath(os.path.dirname(__file__))
 
 
-def get_db_connection():
-    conn = sqlite3.connect('users_database.db')
-    conn.row_factory = sqlite3.Row
-    return conn
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'your secret key'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+
+# SQLAlchemy models
+
+class Users(db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String, unique=True, nullable=False)
+    password = db.Column(db.String, nullable=False)
+    user_type = db.Column(db.String, nullable=False)
+
+class Course(db.Model):
+    __tablename__ = 'courses'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String, nullable=False)
+    trimester = db.Column(db.Integer, nullable=False)
+    code = db.Column(db.String, nullable=False)
+    content = db.Column(db.String, nullable=False)
+
+class Template(db.Model):
+    __tablename__ = 'templates'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, nullable=False)
+    field_name = db.Column(db.String, nullable=False)
+    field_order = db.Column(db.Integer, nullable=False)
+
+
 
 app = Flask(__name__)
 # Adding app secret key
@@ -21,7 +53,7 @@ def Login():
         username = request.form["username"]
         password = request.form["password"]
 
-        conn = get_db_connection()
+        conn = db.session.get(users, )
         cursor = conn.cursor()
         cursor.execute("SELECT password, user_type FROM users WHERE username=?",  (username,))
         user = cursor.fetchone()
