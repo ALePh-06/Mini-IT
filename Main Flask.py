@@ -45,6 +45,12 @@ def get_course(course_id):
         abort(404)
     return course
 
+def get_template(template_id):
+    template = db.session.get(Template, template_id)
+    if template is None:
+        abort(404)
+    return template
+
 with app.app_context():
     db.create_all()
 
@@ -52,11 +58,11 @@ app = Flask(__name__)
 # Adding app secret key
 app.secret_key = "#83yUi_a"
 
-@app.before_request
+'''@app.before_request
 def require_login():
     allowed_routes = ['Login', 'signup', 'static']
     if request.endpoint not in allowed_routes and 'username' not in session:
-        return redirect(url_for('Login'))
+        return redirect(url_for('Login'))'''
 
 @app.route('/Login', methods=["GET", "POST"])
 def Login():
@@ -111,11 +117,12 @@ def signup():
 @app.route('/')
 def index():
     courses = Course.query.all()
-
-    if session['user_type'] == 'lecturer':
+    return render_template('student_home.html', courses=courses) 
+    
+'''    if session['user_type'] == 'lecturer':
         return render_template('lecturer_home.html', courses=courses)  # Create this template
     else:
-        return render_template('student_home.html', courses=courses) 
+        '''
     
 
 @app.route('/<int:course_id>')
