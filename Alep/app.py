@@ -39,13 +39,19 @@ def get_course(course_id):
         abort(404)
     return course
 
+def get_template(template_id):
+    template = db.session.get(Template, template_id)
+    if template is None:
+        abort(404)
+    return template
+
 # Routes
 @app.route('/')
 def index():
     courses = Course.query.all()
     return render_template('index.html', courses=courses)
 
-@app.route('/<int:course_id>')
+@app.route('/course/<int:course_id>')
 def view_course(course_id):
     course = get_course(course_id)
     return render_template('view_course.html', course=course)
@@ -92,8 +98,13 @@ def create_template():
 
     return render_template('create_template.html')
 
+@app.route('/template/<int:template_id>')
+def view_template(template_id):
+    template = get_template(template_id)
+    return render_template('view_template.html', template=template)
+
 @app.route('/<int:id>/edit', methods=('GET', 'POST'))
-def edit(id):
+def edit_course(id):
     course = get_course(id)
 
     if request.method == 'POST':
@@ -108,7 +119,25 @@ def edit(id):
             db.session.commit()
             return redirect(url_for('index'))
 
-    return render_template('edit.html', course=course)
+    return render_template('edit_course.html', course=course)
+
+@app.route('/<int:id>/edit', methods=('GET', 'POST'))
+def edit_template(id):
+    template = get_template(id)
+
+    if request.method == 'POST':
+        title = request.form['title']
+        field_name = request.form['field_name']
+
+        if not title:
+            flash('Title is required!')
+        else:
+            template.title = title
+            template.field_name = field_name
+            db.session.commit()
+            return redirect(url_for('index'))
+
+    return render_template('edit.html', template=template)
 
 @app.route('/<int:id>/delete', methods=('POST',))
 def delete(id):
