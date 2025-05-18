@@ -74,11 +74,18 @@ def login():
             # Users checker
         user = Users.query.filter_by(username=username).first()
 
-        if user and bcrypt.checkpw(password.encode("utf-8"), user[0]):
+        if user and bcrypt.checkpw(password.encode("utf-8"), user.password.encode("utf-8")):
             session["username"] = username
             session["user_type"] = user[1]
-            flash("Login successful!")
-            return redirect(url_for("homepage"))
+            
+            # Redirect based on user type
+            if user.user_type == "student":
+                flash("Login successful! Welcome, student!")
+                return redirect(url_for("#"))  # Redirect to student homepage
+            elif user.user_type == "lecturer":
+                flash("Login successful! Welcome, lecturer!")
+                return redirect(url_for("#"))  # Redirect to lecturer homepage
+
         else:
             flash("Invalid username or password. Try again.")
             return redirect(url_for("login"))
