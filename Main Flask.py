@@ -89,7 +89,7 @@ def login():
                 return redirect(url_for("#"))  # Redirect to student homepage
             elif user.user_type == "lecturer":
                 flash("Login successful! Welcome, lecturer!")
-                return redirect(url_for("#"))  # Redirect to lecturer homepage
+                return redirect(url_for("index"))  # Redirect to lecturer homepage
 
         else:
             flash("Invalid username or password. Try again.")
