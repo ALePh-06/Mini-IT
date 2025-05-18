@@ -7,7 +7,7 @@
             <h2>{{ course['title'] }}</h2>
         </a>
         <span class="badge badge-primary">Trimester : {{ course['trimester'] }}</span>
-        <a href="{{ url_for('edit', id=course['id']) }}">
+        <a href="{{ url_for('edit_course', id=course['id']) }}">
             <span class="badge badge-warning">Edit</span>
         </a>
         <hr>
