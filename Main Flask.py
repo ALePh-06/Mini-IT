@@ -83,13 +83,9 @@ def login():
             session["username"] = username
             session["user_type"] = user[1]
             
-            # Redirect based on user type
-            if user.user_type == "student":
-                flash("Login successful! Welcome, student!")
-                return redirect(url_for("#"))  # Redirect to student homepage
-            elif user.user_type == "lecturer":
-                flash("Login successful! Welcome, lecturer!")
-                return redirect(url_for("#"))  # Redirect to lecturer homepage
+            # Redirect to a single index route
+            flash(f"Login successful! Welcome, {user.user_type}!")
+            return redirect(url_for("index"))
 
         else:
             flash("Invalid username or password. Try again.")
