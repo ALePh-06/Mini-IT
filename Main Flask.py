@@ -52,18 +52,23 @@ def get_course(course_id):
     if course is None:
         abort(404)
     return course
-# deleting and re building the databases
+def get_template(template_id):
+    template = db.session.get(Template, template_id)
+    if template is None:
+        abort(404)
+    return template
+
 with app.app_context():
     db.create_all()
 
 # Adding app secret key
 app.secret_key = "#83yUi_a"
 
-@app.before_request
+'''@app.before_request
 def require_login():
     allowed_routes = ['login', 'signup', 'static']
     if request.endpoint not in allowed_routes and 'username' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('Login'))'''
 
 @app.route('/Login', methods=["GET", "POST"])
 def login():
@@ -140,7 +145,13 @@ def signup():
 @app.route('/')
 def index():
     courses = Course.query.all()
-    return render_template('index.html', courses=courses)
+   
+    
+    if session['user_type'] == 'lecturer':
+        return render_template('Index.html', courses=courses)  # Create this template
+    else:
+        return render_template('Index_s.html', courses=courses)
+    
 
 @app.route('/<int:course_id>')
 def view_course(course_id):
@@ -190,7 +201,7 @@ def create_template():
     return render_template('create_template.html')
 
 @app.route('/<int:id>/edit', methods=('GET', 'POST'))
-def edit(id):
+def edit_course(id):
     course = get_course(id)
 
     if request.method == 'POST':
@@ -205,14 +216,32 @@ def edit(id):
             db.session.commit()
             return redirect(url_for('index'))
 
-    return render_template('edit.html', course=course)
+    return render_template('edit_course.html', course=course)
+
+@app.route('/<int:id>/edit', methods=('GET', 'POST'))
+def edit_template(id):
+    template = get_template(id)
+
+    if request.method == 'POST':
+        title = request.form['title']
+        field_name = request.form['field_name']
+
+        if not title:
+            flash('Title is required!')
+        else:
+            template.title = title
+            template.field_name = field_name
+            db.session.commit()
+            return redirect(url_for('index'))
+
+    return render_template('edit.html', template=template)
 
 @app.route('/<int:id>/delete', methods=('POST',))
 def delete(id):
     course = get_course(id)
     db.session.delete(course)
     db.session.commit()
-    flash(f'"{course.title}" was successfully deleted!')
+    flash(f'Course "{course.title}" was successfully deleted!')
     return redirect(url_for('index'))
 
 app.run(host="0.0.0.0", port=5000, debug=True)
