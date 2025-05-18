@@ -64,11 +64,11 @@ with app.app_context():
 # Adding app secret key
 app.secret_key = "#83yUi_a"
 
-'''@app.before_request
+@app.before_request
 def require_login():
     allowed_routes = ['login', 'signup', 'static']
     if request.endpoint not in allowed_routes and 'username' not in session:
-        return redirect(url_for('Login'))'''
+        return redirect(url_for('Login'))
 
 @app.route('/Login', methods=["GET", "POST"])
 def login():
@@ -145,7 +145,6 @@ def signup():
 @app.route('/')
 def index():
     courses = Course.query.all()
-   
     
     if session['user_type'] == 'lecturer':
         return render_template('Index.html', courses=courses)  # Create this template
