@@ -1,8 +1,0 @@
-{% extends 'base.html' %}
-
-{% block content %}
-    <h2>{% block title %} {{ course['title'] }} {% endblock %}</h2>
-    <span class="badge badge-primary">Trimester : {{ course['trimester'] }}</span>
-    <p>Course code : {{ course['code'] }}</p>
-    <p>{{ course['content'] }}</p>
-{% endblock %}
