@@ -81,7 +81,7 @@ def login():
 
         if user and bcrypt.checkpw(password.encode("utf-8"), user.password.encode("utf-8")):
             session["username"] = username
-            session["user_type"] = user[1]
+            session["user_type"] = user.user_type
             
             # Redirect to a single index route
             flash(f"Login successful! Welcome, {user.user_type}!")
