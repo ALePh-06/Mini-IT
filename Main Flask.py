@@ -10,7 +10,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your secret key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'mydatabase.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -39,21 +39,32 @@ class Template(db.Model):
     field_name = db.Column(db.String, nullable=False)
     field_order = db.Column(db.Integer, nullable=False)
 
+def get_course(course_id):
+    course = db.session.get(Course, course_id)
+    if course is None:
+        abort(404)
+    return course
 
+with app.app_context():
+    db.create_all()
 
 app = Flask(__name__)
 # Adding app secret key
 app.secret_key = "#83yUi_a"
 
+@app.before_request
+def require_login():
+    allowed_routes = ['Login', 'signup', 'static']
+    if request.endpoint not in allowed_routes and 'username' not in session:
+        return redirect(url_for('Login'))
 
-
-@app.route('/', methods=["GET", "POST"])
+@app.route('/Login', methods=["GET", "POST"])
 def Login():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
 
-        conn = db.session.get(users, )
+        conn = db.session.get(Users, username, password, user_type)
         cursor = conn.cursor()
         cursor.execute("SELECT password, user_type FROM users WHERE username=?",  (username,))
         user = cursor.fetchone()
@@ -63,7 +74,7 @@ def Login():
         if user :
             session["username"] = username
             session["user_type"] = user[1] # This code is for differentiate between students and lecturers
-            return redirect(Homepage)
+            return redirect(url_for('Index'))
         else:
             return "Invalid username or password. Try again."
 
@@ -96,17 +107,83 @@ def signup():
 
     return render_template("Signup.html") # This is the render template!!!!!!!!!!!!!!!!!!!!#
 
-@app.route('/Homepage')
-def Homepage():
-    return render_template("Homepage.html")
 
-@app.route('/FormStudent')
-def formstudent():
-    return render_template("FormStudent.html")
+@app.route('/')
+def index():
+    courses = Course.query.all()
+    return render_template('index.html', courses=courses)
 
-@app.route('/Create_Student_Submission_Form')
-def form():
-    return render_template("")
+@app.route('/<int:course_id>')
+def view_course(course_id):
+    course = get_course(course_id)
+    return render_template('view_course.html', course=course)
+
+@app.route('/create_course', methods=('GET', 'POST'))
+def create_course():
+    if request.method == 'POST':
+        title = request.form['title']
+        trimester = request.form['trimester']
+        code = request.form['code']
+        content = request.form['content']
+
+        if not title:
+            flash('Title is required!')
+        elif not trimester:
+            flash('Trimester is required!')
+        elif not code:
+            flash('Code is required!')
+        else:
+            new_course = Course(title=title, trimester=int(trimester), code=code, content=content)
+            db.session.add(new_course)
+            db.session.commit()
+            return redirect(url_for('index'))
+
+    return render_template('create_course.html')
+
+@app.route('/create_template', methods=('GET', 'POST'))
+def create_template():
+    if request.method == 'POST':
+        template_name = request.form['name']
+        field_names = request.form.getlist('field_name')
+
+        if not template_name:
+            flash('Name of template is required!')
+        elif not field_names or all(f.strip() == '' for f in field_names):
+            flash('At least one field name is required!')
+        else:
+            for i, fname in enumerate(field_names):
+                if fname.strip():
+                    new_template = Template(name=template_name, field_name=fname.strip(), field_order=i)
+                    db.session.add(new_template)
+            db.session.commit()
+            return redirect(url_for('index'))
+
+    return render_template('create_template.html')
+
+@app.route('/<int:id>/edit', methods=('GET', 'POST'))
+def edit(id):
+    course = get_course(id)
+
+    if request.method == 'POST':
+        title = request.form['title']
+        content = request.form['content']
+
+        if not title:
+            flash('Title is required!')
+        else:
+            course.title = title
+            course.content = content
+            db.session.commit()
+            return redirect(url_for('index'))
+
+    return render_template('edit.html', course=course)
+
+@app.route('/<int:id>/delete', methods=('POST',))
+def delete(id):
+    course = get_course(id)
+    db.session.delete(course)
+    db.session.commit()
+    flash(f'"{course.title}" was successfully deleted!')
+    return redirect(url_for('index'))
 
 app.run(host="0.0.0.0", port=5000, debug=True)
-# This code creates a simple Flask web application that returns when accessed at the root URL. a

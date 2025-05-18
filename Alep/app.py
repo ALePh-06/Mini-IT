@@ -1,5 +1,3 @@
-# Converted version of your Flask app using SQLAlchemy instead of raw SQL
-
 from flask import Flask, render_template, request, url_for, flash, redirect
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.exceptions import abort
@@ -30,6 +28,9 @@ class Template(db.Model):
     name = db.Column(db.String, nullable=False)
     field_name = db.Column(db.String, nullable=False)
     field_order = db.Column(db.Integer, nullable=False)
+
+with app.app_context():
+    db.create_all()
 
 # Utility
 
