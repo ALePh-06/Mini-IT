@@ -2,7 +2,7 @@ import sqlite3
 # Added render template and more
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 # Putting bcrypt
-import bcrypt
+
 
 def get_db_connection():
     conn = sqlite3.connect('users_database.db')
@@ -21,7 +21,7 @@ def Login():
         username = request.form["username"]
         password = request.form["password"]
 
-        
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT password, user_type FROM users WHERE username=?",  (username,))
         user = cursor.fetchone()
@@ -77,4 +77,4 @@ def form():
     return render_template("Form.html")
 
 app.run(host="0.0.0.0", port=5000, debug=True)
-# This code creates a simple Flask web application that returns when accessed at the root URL.
+# This code creates a simple Flask web application that returns when accessed at the root URL. a
