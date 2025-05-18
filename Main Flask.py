@@ -57,19 +57,16 @@ app.secret_key = "#83yUi_a"
 def require_login():
     allowed_routes = ['Login', 'signup', 'static']
     if request.endpoint not in allowed_routes and 'username' not in session:
-        return redirect(url_for('Login'))
+        return redirect(url_for('login'))
 
-@app.route('/', methods=["GET", "POST"])
+@app.route('/Login', methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
 
-        conn = get_db_connection() # Need to change
-        cursor = conn.cursor()
-        cursor.execute("SELECT password, user_type FROM users WHERE username=?", (username,))
-        user = cursor.fetchone()
-        conn.close()
+            # Users checker
+        user = Users.query.filter_by(username=username).first()
 
         if user and bcrypt.checkpw(password.encode("utf-8"), user[0]):
             session["username"] = username
@@ -97,7 +94,7 @@ def signup():
             return redirect(url_for("signup"))
 
         # Hash the password
-        hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+        hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
         # Determine user type
         if special_code == "Lecturer123": 
@@ -107,12 +104,15 @@ def signup():
 
         # Check if username is unique
         try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO users (username, password, user_type) VALUES (?, ?, ?)", 
-                           (username, hashed_password, user_type))
-            conn.commit()
-            conn.close()
+            existing_user = Users.query.filter_by(username=username).first()
+            if existing_user:
+                flash("Username already exists. Please choose a different username.")
+                return redirect(url_for("signup"))
+            
+            # Save user to database
+            new_user = Users(username=username, password=hashed_password, user_type=user_type)
+            db.session.add(new_user)
+            db.session.commit()
 
             flash("Account created successfully! Please log in.")
             return redirect(url_for("login"))
