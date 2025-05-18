@@ -68,7 +68,7 @@ app.secret_key = "#83yUi_a"
 def require_login():
     allowed_routes = ['login', 'signup', 'static']
     if request.endpoint not in allowed_routes and 'username' not in session:
-        return redirect(url_for('Login'))
+        return redirect(url_for('login'))
 
 @app.route('/Login', methods=["GET", "POST"])
 def login():
