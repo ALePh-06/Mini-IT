@@ -31,6 +31,9 @@ class Template(db.Model):
     field_name = db.Column(db.String, nullable=False)
     field_order = db.Column(db.Integer, nullable=False)
 
+with app.app_context():
+    db.create_all()
+
 # Utility
 
 def get_course(course_id):
