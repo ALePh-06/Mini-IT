@@ -111,7 +111,12 @@ def signup():
 @app.route('/')
 def index():
     courses = Course.query.all()
-    return render_template('index.html', courses=courses)
+
+    if session['user_type'] == 'lecturer':
+        return render_template('lecturer_home.html', courses=courses)  # Create this template
+    else:
+        return render_template('student_home.html', courses=courses) 
+    
 
 @app.route('/<int:course_id>')
 def view_course(course_id):
@@ -161,7 +166,7 @@ def create_template():
     return render_template('create_template.html')
 
 @app.route('/<int:id>/edit', methods=('GET', 'POST'))
-def edit(id):
+def edit_course(id):
     course = get_course(id)
 
     if request.method == 'POST':
@@ -176,7 +181,25 @@ def edit(id):
             db.session.commit()
             return redirect(url_for('index'))
 
-    return render_template('edit.html', course=course)
+    return render_template('edit_course.html', course=course)
+
+@app.route('/<int:id>/edit', methods=('GET', 'POST'))
+def edit_template(id):
+    template = get_template(id)
+
+    if request.method == 'POST':
+        title = request.form['title']
+        field_name = request.form['field_name']
+
+        if not title:
+            flash('Title is required!')
+        else:
+            template.title = title
+            template.field_name = field_name
+            db.session.commit()
+            return redirect(url_for('index'))
+
+    return render_template('edit.html', template=template)
 
 @app.route('/<int:id>/delete', methods=('POST',))
 def delete(id):
