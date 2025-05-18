@@ -4,16 +4,24 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.exceptions import abort
 import os
-
+import bcrypt
 basedir = os.path.abspath(os.path.dirname(__file__))
+db_path = os.path.join(basedir, 'mydatabase.db')
 
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your secret key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'mydatabase.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+if os.path.exists(db_path):
+    try:
+        os.remove(db_path)
+        print("Database deleted.")
+    except PermissionError:
+        print("Database is in use. Close other processes using it first.")
 
 # SQLAlchemy models
 
@@ -44,7 +52,6 @@ def get_course(course_id):
     if course is None:
         abort(404)
     return course
-
 def get_template(template_id):
     template = db.session.get(Template, template_id)
     if template is None:
@@ -54,62 +61,76 @@ def get_template(template_id):
 with app.app_context():
     db.create_all()
 
-app = Flask(__name__)
 # Adding app secret key
 app.secret_key = "#83yUi_a"
 
-'''@app.before_request
+@app.before_request
 def require_login():
-    allowed_routes = ['Login', 'signup', 'static']
+    allowed_routes = ['login', 'signup', 'static']
     if request.endpoint not in allowed_routes and 'username' not in session:
-        return redirect(url_for('Login'))'''
+        return redirect(url_for('Login'))
 
 @app.route('/Login', methods=["GET", "POST"])
-def Login():
+def login():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
 
-        conn = db.session.get(Users, username, password, user_type)
-        cursor = conn.cursor()
-        cursor.execute("SELECT password, user_type FROM users WHERE username=?",  (username,))
-        user = cursor.fetchone()
-        conn.close()
+            # Users checker
+        user = Users.query.filter_by(username=username).first()
 
-        # Verify stored hashed password
-        if user :
+        if user and bcrypt.checkpw(password.encode("utf-8"), user[0]):
             session["username"] = username
-            session["user_type"] = user[1] # This code is for differentiate between students and lecturers
-            return redirect(url_for('Index'))
+            session["user_type"] = user[1]
+            flash("Login successful!")
+            return redirect(url_for("homepage"))
         else:
-            return "Invalid username or password. Try again."
+            flash("Invalid username or password. Try again.")
+            return redirect(url_for("login"))
 
     return render_template("Login.html") # This is the render template!!!!!!!!!!!!!!!!!!!!#
 
 # Configuring SignUp to differentiate Students and Lecturers
-@app.route('/Signup', methods=("GET", "POST"))
+@app.route('/Signup', methods=["GET", "POST"])
 def signup():
-    if request.method == "POST": 
-        username = request.form["username"]
-        password = request.form["password"]
-        confirm_password = request.form["ConfirmPassword"]
-        _code = request.form["special_code"]
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        ConfirmPassword = request.form.get("ConfirmPassword", "").strip()
+        special_code = request.form.get("special_code", "").strip()
 
-        if password != confirm_password:
-            flash('Passwords do not match. Try again.')    
-            return redirect(url_for("Signup"))    
+        # Password match check
+        if password != ConfirmPassword:
+            flash("Passwords do not match. Please try again.")
+            return redirect(url_for("signup"))
+
+        # Hash the password
+        hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+        # Determine user type
+        if special_code == "Lecturer123": 
+            user_type = "lecturer"
         else:
-            try:
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("INSERT INTO users (username, password, user_type) VALUES (?, ?, ?)",
-                               (username, password, "student"))  
-                conn.commit()
-                conn.close()
-                return redirect(url_for("Login"))
-            except sqlite3.IntegrityError:
-                flash ('Username already exist!')
-                return redirect(url_for('Signup'))
+            user_type = "student"
+
+        # Check if username is unique
+        try:
+            existing_user = Users.query.filter_by(username=username).first()
+            if existing_user:
+                flash("Username already exists. Please choose a different username.")
+                return redirect(url_for("signup"))
+            
+            # Save user to database
+            new_user = Users(username=username, password=hashed_password, user_type=user_type)
+            db.session.add(new_user)
+            db.session.commit()
+
+            flash("Account created successfully! Please log in.")
+            return redirect(url_for("login"))
+
+        except sqlite3.IntegrityError:
+            flash("Username already exists. Please choose a different username.")
+            return redirect(url_for("signup"))
 
     return render_template("Signup.html") # This is the render template!!!!!!!!!!!!!!!!!!!!#
 
