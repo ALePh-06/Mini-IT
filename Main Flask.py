@@ -5,7 +5,6 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.exceptions import abort
 import os
 import bcrypt
-
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 
@@ -55,7 +54,7 @@ app.secret_key = "#83yUi_a"
 
 @app.before_request
 def require_login():
-    allowed_routes = ['Login', 'signup', 'static']
+    allowed_routes = ['login', 'signup', 'static']
     if request.endpoint not in allowed_routes and 'username' not in session:
         return redirect(url_for('login'))
 
