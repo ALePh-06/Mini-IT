@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1>{% block title %} Create a New Template {% endblock %}</h1>
+
+<form method="POST">
+    <div class="form-group">
+        <label for="name">Template Name</label>
+        <input type="text" name="name"
+               placeholder="Template Name" class="form-control"
+               value="{{ request.form.get('name', '') }}">
+    </div>
+
+    <div class="form-group">
+        <label>Template Fields</label>
+        <div id="fields-container">
+            <input type="text" name="field_name" class="form-control mb-2"
+                   placeholder="Field Name" required>
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="addField()">Add Another Field</button>
+    </div>
+
+    <div class="form-group mt-3">
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </div>
+</form>
+
+<script>
+    function addField() {
+        const container = document.getElementById('fields-container');
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.name = 'field_name';
+        input.className = 'form-control mb-2';
+        input.placeholder = 'Field Name';
+        input.required = true;
+        container.appendChild(input);
+    }
+</script>
+{% endblock %}
