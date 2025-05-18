@@ -1,5 +1,3 @@
-# Converted version of your Flask app using SQLAlchemy instead of raw SQL
-
 from flask import Flask, render_template, request, url_for, flash, redirect
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.exceptions import abort
