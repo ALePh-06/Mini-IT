@@ -21,8 +21,8 @@ db = SQLAlchemy(app)
         os.remove(db_path)
         print("Database deleted.")
     except PermissionError:
-        print("Database is in use. Close other processes using it first.")
-'''
+        print("Database is in use. Close other processes using it first.")'''
+
 # SQLAlchemy models
 
 class Users(db.Model):
@@ -44,8 +44,16 @@ class Template(db.Model):
     __tablename__ = 'templates'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
+
+    fields = db.relationship('TemplateField', backref='template', cascade="all, delete-orphan")
+
+class TemplateField(db.Model):
+    __tablename__ = 'template_fields'
+    id = db.Column(db.Integer, primary_key=True)
     field_name = db.Column(db.String, nullable=False)
     field_order = db.Column(db.Integer, nullable=False)
+
+    template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
 
 def get_course(course_id):
     course = db.session.get(Course, course_id)
@@ -179,23 +187,39 @@ def create_course():
 def create_template():
     if request.method == 'POST':
         template_name = request.form['name']
-        field_names = request.form.getlist('field_name')
+        field_names = request.form.getlist('field_name[]')
 
         if not template_name:
-            flash('Name of template is required!')
+            flash('Template name is required.')
         elif not field_names or all(f.strip() == '' for f in field_names):
-            flash('At least one field name is required!')
+            flash('At least one field name is required.')
         else:
+            # Create the template
+            new_template = Template(name=template_name)
+            db.session.add(new_template)
+            db.session.commit()
+
+            # Add fields linked to the template
             for i, fname in enumerate(field_names):
                 if fname.strip():
-                    new_template = Template(name=template_name, field_name=fname.strip(), field_order=i)
-                    db.session.add(new_template)
+                    new_field = TemplateField(
+                        field_name=fname.strip(),
+                        field_order=i,
+                        template_id=new_template.id
+                    )
+                    db.session.add(new_field)
             db.session.commit()
+            flash('Template created successfully!')
             return redirect(url_for('index'))
 
     return render_template('create_template.html')
 
-@app.route('/<int:id>/edit', methods=('GET', 'POST'))
+@app.route('/view_template')
+def view_template():
+    templates = Template.query.all()
+    return render_template('view_template.html', templates=templates)
+
+@app.route('/edit_course/<int:id>', methods=('GET', 'POST'))
 def edit_course(id):
     course = get_course(id)
 
@@ -213,7 +237,7 @@ def edit_course(id):
 
     return render_template('edit_course.html', course=course)
 
-@app.route('/<int:id>/edit', methods=('GET', 'POST'))
+@app.route('/edit_template/<int:id>', methods=('GET', 'POST'))
 def edit_template(id):
     template = get_template(id)
 

@@ -12,10 +12,15 @@
     </div>
 
     <div class="form-group">
-        <label>Template Fields</label>
+        <label>Template Fields (Drag to reorder)</label>
         <div id="fields-container">
-            <input type="text" name="field_name" class="form-control mb-2"
-                   placeholder="Field Name" required>
+            <div class="input-group mb-2 draggable-field align-items-center">
+                <span class="drag-handle mr-2">☰</span>
+                <input type="text" name="field_name[]" class="form-control" placeholder="Field Name" required>
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-danger" onclick="confirmRemoveField(this)">Remove</button>
+                </div>
+            </div>
         </div>
         <button type="button" class="btn btn-secondary" onclick="addField()">Add Another Field</button>
     </div>
@@ -25,16 +30,69 @@
     </div>
 </form>
 
+<!-- Sortable.js CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<!-- Custom Script -->
 <script>
     function addField() {
         const container = document.getElementById('fields-container');
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'input-group mb-2 draggable-field align-items-center';
+
+        const dragHandle = document.createElement('span');
+        dragHandle.className = 'drag-handle mr-2';
+        dragHandle.innerHTML = '☰';
+
         const input = document.createElement('input');
         input.type = 'text';
-        input.name = 'field_name';
-        input.className = 'form-control mb-2';
+        input.name = 'field_name[]';
+        input.className = 'form-control';
         input.placeholder = 'Field Name';
         input.required = true;
-        container.appendChild(input);
+
+        const appendDiv = document.createElement('div');
+        appendDiv.className = 'input-group-append';
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn btn-danger';
+        removeBtn.textContent = 'Remove';
+        removeBtn.onclick = function() {
+            confirmRemoveField(removeBtn);
+        };
+
+        appendDiv.appendChild(removeBtn);
+        wrapper.appendChild(dragHandle);
+        wrapper.appendChild(input);
+        wrapper.appendChild(appendDiv);
+        container.appendChild(wrapper);
     }
+
+    function confirmRemoveField(button) {
+        const confirmed = confirm("Are you sure you want to remove this field?");
+        if (confirmed) {
+            const wrapper = button.closest('.input-group');
+            wrapper.remove();
+        }
+    }
+
+    // Enable drag-and-drop sorting
+    Sortable.create(document.getElementById('fields-container'), {
+        animation: 150,
+        handle: '.drag-handle',
+        ghostClass: 'bg-light'
+    });
 </script>
+
+<!-- Optional styling for drag handle -->
+<style>
+    .drag-handle {
+        cursor: grab;
+        user-select: none;
+        font-size: 1.2em;
+        line-height: 1;
+    }
+</style>
 {% endblock %}

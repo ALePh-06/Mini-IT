@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block title %}Templates{% endblock %}
+
+{% block content %}
+    <h2>Available Templates</h2>
+    {% for template in templates %}
+        <div class="card my-3">
+            <div class="card-body">
+                <h5 class="card-title">{{ template.name }}</h5>
+                <ul>
+                    {% for field in template.fields %}
+                        <li>{{ field.field_order + 1 }}. {{ field.field_name }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    {% else %}
+        <p>No templates found.</p>
+    {% endfor %}
+{% endblock %}
