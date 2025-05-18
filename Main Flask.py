@@ -6,14 +6,22 @@ from werkzeug.exceptions import abort
 import os
 import bcrypt
 basedir = os.path.abspath(os.path.dirname(__file__))
+db_path = os.path.join(basedir, 'mydatabase.db')
 
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your secret key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'mydatabase.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+if os.path.exists(db_path):
+    try:
+        os.remove(db_path)
+        print("Database deleted.")
+    except PermissionError:
+        print("Database is in use. Close other processes using it first.")
 
 # SQLAlchemy models
 
@@ -44,11 +52,10 @@ def get_course(course_id):
     if course is None:
         abort(404)
     return course
-
+# deleting and re building the databases
 with app.app_context():
     db.create_all()
 
-app = Flask(__name__)
 # Adding app secret key
 app.secret_key = "#83yUi_a"
 
