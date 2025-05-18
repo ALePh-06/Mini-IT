@@ -10,7 +10,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your secret key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'mydatabase.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -39,7 +39,8 @@ class Template(db.Model):
     field_name = db.Column(db.String, nullable=False)
     field_order = db.Column(db.Integer, nullable=False)
 
-
+with app.app_context():
+    db.create_all()
 
 app = Flask(__name__)
 # Adding app secret key
@@ -53,7 +54,7 @@ def Login():
         username = request.form["username"]
         password = request.form["password"]
 
-        conn = db.session.get(users, )
+        conn = db.session.get(Users, username, password, user_type)
         cursor = conn.cursor()
         cursor.execute("SELECT password, user_type FROM users WHERE username=?",  (username,))
         user = cursor.fetchone()
