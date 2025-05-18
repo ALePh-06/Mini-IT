@@ -183,7 +183,7 @@ def delete(id):
     course = get_course(id)
     db.session.delete(course)
     db.session.commit()
-    flash(f'"{course.title}" was successfully deleted!')
+    flash(f'Course "{course.title}" was successfully deleted!')
     return redirect(url_for('index'))
 
 app.run(host="0.0.0.0", port=5000, debug=True)
