@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Submission Form</title>
+     <!--<link rel="stylesheet" href="FormStyle.css">-->
+    <link rel="stylesheet" href="{{ url_for('static', filename='FormStyle.css') }}">
+</head>
+
+<script>
+function toggleAdvanced() {
+    const options = document.getElementById('advanced-options');
+    const button = event.target;
+    if (options.style.display === "none") {
+        options.style.display = "block";
+        button.innerText = "Less Options ▲";
+    } else {
+        options.style.display = "none";
+        button.innerText = "More Options ▼";
+    }
+}
+</script>
+
+
+<body>
+    <div style="text-align: center;">
+        <h1>Form Submission</h1>
+        <form action="{{ url_for('submit') }}" method="post" enctype="multipart/form-data">
+            <div class="title">
+                <label for="Title">Title:</label>
+                <textarea id="Title" name="Title" required></textarea>
+            </div>
+
+            <div class="description">
+                <label for="Description">Description:</label>
+                <textarea id="Description" name="Description" required></textarea>
+            </div>
+
+            <label for="Upload_file">Upload file:</label>
+            <input type="file" id="Upload_file" name="Upload_file" accept="image/png, image/jpeg, application/pdf"><br><br>
+
+            <button type="button" onclick="toggleAdvanced()">More Options ▼</button>
+
+            <div id="advanced-options" style="display: none; margin-top: 20px;">
+                <div class="timer">
+                    <label for="Timer">Timer (minutes):</label>
+                    <input type="number" id="Timer" name="Timer" min="0">
+                </div>
+
+                <div class="late-submission">
+                    <label for="Allow_Late">Allow Late Submission:</label>
+                    <input type="checkbox" id="Allow_Late" name="Allow_Late">
+                </div>
+
+                <div class="auto-close">
+                    <label for="Auto_Close">Auto-close After Deadline:</label>
+                    <input type="checkbox" id="Auto_Close" name="Auto_Close">
+                </div>
+
+                <div class="visibility">
+                    <label for="Open_Date">Visibility / Open Date:</label>
+                    <input type="datetime-local" id="Open_Date" name="Open_Date">
+                </div>
+
+                <div class="marks">
+                    <label for="Max_Marks">Maximum Marks:</label>
+                    <input type="number" id="Max_Marks" name="Max_Marks" min="0">
+                </div>
+            </div></br>
+
+            <hr>
+
+            <button class="submit-button" type="submit">Publish</button>
+        </form>
+    </div>
+</body>
+
+</html>

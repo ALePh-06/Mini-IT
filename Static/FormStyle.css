@@ -79,3 +79,15 @@ body {
   background-color: #10ab2d; /* Green when hovered */
   transform: scale(1.2); /* Slightly enlarges the button */
 }
+
+#advanced-options label {
+    display: block;
+    margin: 10px 0 5px;
+}
+
+#advanced-options input {
+    margin-bottom: 15px;
+    padding: 5px;
+    width: 100%;
+    max-width: 300px;
+}

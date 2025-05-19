@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Submission History</title>
+</head>
+
+<body>
+    <h1>Submission History</h1>
+    <ul>
+    {% for s in submissions %}
+        <li>
+            <strong>{{ s.group_name }}</strong> - {{ s.title }}<br>
+            {{ s.description }}<br>
+            <em>{{ s.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</em>
+             {% if s.filename %}
+                <a href="{{ url_for('download', filename=s.filename) }}" download>Download File</a> 
+            {% endif %}
+        </li>
+        <hr>
+    {% endfor %}
+    </ul>
+</body>
+
+<!-- The form allows the user to select a group name from a dropdown list and submit the form to filter the results. -->
+<form method="get" action="{{ url_for('history') }}">
+    <label for="group_filter">Filter by Group Name:</label>
+    <select name="group_name" id="group_filter" onchange="this.form.submit()">
+        <option value="">All Groups</option>
+        {% for group in group_names %}
+            <option value="{{ group }}" {% if group == selected_group %}selected{% endif %}>{{ group }}</option>
+        {% endfor %}
+    </select>
+</form>
+
+<a href="/">Back to Form</a>
+
+</html>
