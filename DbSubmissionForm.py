@@ -33,6 +33,20 @@ class Submission(db.Model):
     description = db.Column(db.Text, nullable=False)
     filename = db.Column(db.String(255))
     timestamp = db.Column(db.DateTime, default=malaysia_time)
+    
+class SubmissionTemplate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)    
+
+#Setting for submission
+class SubmissionSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    template_id = db.Column(db.Integer)
+    due_date = db.Column(db.DateTime, nullable=False)
+    allow_late = db.Column(db.Boolean, default=False)
+    auto_close = db.Column(db.Boolean, default=False)
+    late_penalty_info = db.Column(db.Text)  # e.g. "10% deduction per day"
+
 
 # Create tables
 with app.app_context():
@@ -110,9 +124,10 @@ def history():
 def download(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)   
 
-@app.route('/lecturerForm')
+@app.route('/LecturerForm')
 def lecturer():
-    return render_template('lecturerForm.html')
+    if session['user_type'] == 'lecturer':
+        return render_template('LecturerForm.html')
 
 
 if __name__ == '__main__':

@@ -26,7 +26,7 @@ function toggleAdvanced() {
 
 <body>
     <div style="text-align: center;">
-        <h1>Form Submission</h1>
+        <h1>Form Creation</h1>
         <form action="{{ url_for('submit') }}" method="post" enctype="multipart/form-data">
             <div class="title">
                 <label for="Title">Title:</label>
@@ -44,35 +44,29 @@ function toggleAdvanced() {
             <button type="button" onclick="toggleAdvanced()">More Options ▼</button>
 
             <div id="advanced-options" style="display: none; margin-top: 20px;">
-                <div class="timer">
-                    <label for="Timer">Timer (minutes):</label>
-                    <input type="number" id="Timer" name="Timer" min="0">
-                </div>
+                <label>Due Date:</label>
+                <input type="datetime-local" name="due_date" required>
 
-                <div class="late-submission">
-                    <label for="Allow_Late">Allow Late Submission:</label>
-                    <input type="checkbox" id="Allow_Late" name="Allow_Late">
-                </div>
+                <label>Allow Late Submission?</label>
+                <select name="allow_late">
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+                </select>
 
-                <div class="auto-close">
-                    <label for="Auto_Close">Auto-close After Deadline:</label>
-                    <input type="checkbox" id="Auto_Close" name="Auto_Close">
-                </div>
+                <label>Auto Close After Due?</label>
+                <select name="auto_close">
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+                </select>
 
-                <div class="visibility">
-                    <label for="Open_Date">Visibility / Open Date:</label>
-                    <input type="datetime-local" id="Open_Date" name="Open_Date">
-                </div>
-
-                <div class="marks">
-                    <label for="Max_Marks">Maximum Marks:</label>
-                    <input type="number" id="Max_Marks" name="Max_Marks" min="0">
-                </div>
-            </div></br>
+                <label>Late Submission Info:</label>
+                <textarea name="late_penalty_info" placeholder="e.g. 10% deduction per day"></textarea>
+            </div>
 
             <hr>
 
-            <button class="submit-button" type="submit">Publish</button>
+        <button class="submit-button" type="submit">Publish</button>
+            
         </form>
     </div>
 </body>

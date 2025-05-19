@@ -1,10 +1,13 @@
 import sqlite3
 # Added render template and more
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.exceptions import abort
+from werkzeug.utils import secure_filename
 import os
 import bcrypt
+import pytz
+from datetime import datetime
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'mydatabase.db')
 
@@ -262,5 +265,116 @@ def delete(id):
     db.session.commit()
     flash(f'Course "{course.title}" was successfully deleted!')
     return redirect(url_for('index'))
+
+#Naufal
+#Time zone
+def malaysia_time():
+    return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
+
+# Define database model
+class Submission(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    group_name = db.Column(db.String(255), nullable=False) # Nullable means this column is required (can’t be empty), if true it meant optional
+    title = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    filename = db.Column(db.String(255))
+    timestamp = db.Column(db.DateTime, default=malaysia_time)
+    
+class SubmissionTemplate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)    
+
+#Setting for submission
+class SubmissionSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    template_id = db.Column(db.Integer)
+    due_date = db.Column(db.DateTime, nullable=False)
+    allow_late = db.Column(db.Boolean, default=False)
+    auto_close = db.Column(db.Boolean, default=False)
+    late_penalty_info = db.Column(db.Text)  # e.g. "10% deduction per day"
+
+
+# Create tables
+with app.app_context():
+    db.create_all()
+
+# Routes
+@app.route('/StudentForm')
+def StudentForm():
+    return render_template('StudentForm.html')
+
+@app.route('/submit', methods=['POST'])
+def submit():
+    group_name = request.form['Group_Name']
+    title = request.form['Title']
+    description = request.form['Description']
+    file = request.files.get('Upload_file')
+    topics = request.form.getlist('Topics[]')
+
+    filename = None
+    if file and file.filename:
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    
+    #topics = request.form.getlist('Topics[]')
+    #subtopics = request.form.getlist('Subtopics[]')
+    
+    print("Submitted topics:", topics)  # for debug
+
+    # Insert into database
+    new_submission = Submission(
+    group_name=group_name,
+    title=title,
+    description=description,
+    filename=filename,
+    timestamp=malaysia_time()
+)
+    
+    print("Saving file:", filename)
+    print("Saving to DB:", group_name, title, description, filename, malaysia_time())
+
+    try:
+        db.session.add(new_submission)
+        db.session.commit()
+        print("Saved to database!")
+    except Exception as e:
+        db.session.rollback()  # THIS IS IMPORTANT
+        print("Database error:", e)
+
+    rows = db.session.query(Submission).count()
+    print("Rows in DB:", rows)
+    
+    print(group_name, title, description, filename)
+
+    return redirect(url_for('StudentForm'))
+
+@app.route('/SubmissionHistory')
+def history():
+    selected_group = request.args.get('group_name')
+    
+    if selected_group:
+        submissions = Submission.query.filter_by(group_name=selected_group).order_by(Submission.timestamp.desc()).all()
+    else:
+        submissions = Submission.query.order_by(Submission.timestamp.desc()).all()
+
+    group_names = db.session.query(Submission.group_name).distinct().all()
+    group_names = [g[0] for g in group_names]
+
+    return render_template('SubmissionHistory.html',
+                           submissions=submissions,
+                           group_names=group_names,
+                           selected_group=selected_group,
+                           )
+    
+@app.route('/download/<filename>')
+def download(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)   
+
+@app.route('/LecturerForm')
+def lecturer():
+    if session['user_type'] == 'lecturer':
+        return render_template('LecturerForm.html')
+
+
 
 app.run(host="0.0.0.0", port=5000, debug=True)
