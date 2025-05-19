@@ -16,17 +16,20 @@
 
             <div class="login" id="login">
                  <h1>Login</h1>
+
+                 <!-- Add a form element -->
+                <form method="POST" action="{{ url_for('login') }}">
+
                     <div class="input-A">
-                        <input type="text" name="username" id="username" placeholder="Username">
+                        <input type="text" name="username" id="username" placeholder="Username" required>
                     </div>
 
                     <div class="input-A">
-                        <input type="password" name="password" id="password" placeholder="Password">
+                        <input type="password" name="password" id="password" placeholder="Password" required>
                     </div>
 
                     <div class="input-A">
                         <input type="submit" id="LoginButton" value="Login">
-                        <script src="{{ url_for('static', filename='Script.js') }}"></script> <!-- Link to JS in static folder -->
                     </div>
 
                     <div class="links">

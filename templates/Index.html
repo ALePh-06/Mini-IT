@@ -1,13 +1,15 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>My First Flask Page</title>
-</head>
-<body>
-    <h1>Stuff</h1>
-    <br><a href="/">Nothing</a><br>    
-    <br><a href="/Login">Login</a><br>
-    <br><a href="/FormStudent">FormStudent</a><br>
-    <br><a href="/Create_Student_Submission_Form">Create Student Submission Form</a><br>
-</body>
-</html>
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>{% block title %} Welcome to ProjectProposalSystem {% endblock %}</h1>
+    {% for course in courses %}
+        <a href="{{ url_for('view_course', course_id=course['id']) }}">
+            <h2>{{ course['title'] }}</h2>
+        </a>
+        <span class="badge badge-primary">Trimester : {{ course['trimester'] }}</span>
+        <a href="{{ url_for('edit_course', id=course['id']) }}">
+            <span class="badge badge-warning">Edit</span>
+        </a>
+        <hr>
+    {% endfor %}
+{% endblock %}
