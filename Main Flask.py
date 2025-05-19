@@ -28,6 +28,11 @@ db = SQLAlchemy(app)
 
 # SQLAlchemy models
 
+def malaysia_time():
+    return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
+
+
+
 class Users(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -58,6 +63,29 @@ class TemplateField(db.Model):
 
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
 
+class Submission(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    group_name = db.Column(db.String(255), nullable=False) # Nullable means this column is required (can’t be empty), if true it meant optional
+    title = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    filename = db.Column(db.String(255))
+    timestamp = db.Column(db.DateTime, default=malaysia_time)
+    
+class SubmissionTemplate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)    
+
+#Setting for submission
+class SubmissionSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    template_id = db.Column(db.Integer)
+    due_date = db.Column(db.DateTime, nullable=False)
+    allow_late = db.Column(db.Boolean, default=False)
+    auto_close = db.Column(db.Boolean, default=False)
+    late_penalty_info = db.Column(db.Text)  # e.g. "10% deduction per day"
+
+
+
 def get_course(course_id):
     course = db.session.get(Course, course_id)
     if course is None:
@@ -68,6 +96,7 @@ def get_template(template_id):
     if template is None:
         abort(404)
     return template
+
 
 with app.app_context():
     db.create_all()
@@ -268,35 +297,6 @@ def delete(id):
 
 #Naufal
 #Time zone
-def malaysia_time():
-    return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
-
-# Define database model
-class Submission(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    group_name = db.Column(db.String(255), nullable=False) # Nullable means this column is required (can’t be empty), if true it meant optional
-    title = db.Column(db.Text, nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    filename = db.Column(db.String(255))
-    timestamp = db.Column(db.DateTime, default=malaysia_time)
-    
-class SubmissionTemplate(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), nullable=False)    
-
-#Setting for submission
-class SubmissionSettings(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    template_id = db.Column(db.Integer)
-    due_date = db.Column(db.DateTime, nullable=False)
-    allow_late = db.Column(db.Boolean, default=False)
-    auto_close = db.Column(db.Boolean, default=False)
-    late_penalty_info = db.Column(db.Text)  # e.g. "10% deduction per day"
-
-
-# Create tables
-with app.app_context():
-    db.create_all()
 
 # Routes
 @app.route('/StudentForm')
