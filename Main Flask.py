@@ -350,7 +350,8 @@ def submit():
 
 @app.route('/SubmissionHistory')
 def history():
-    selected_group = request.args.get('group_name')
+    if session['user_type'] == 'lecturer':
+        selected_group = request.args.get('group_name')
     
     if selected_group:
         submissions = Submission.query.filter_by(group_name=selected_group).order_by(Submission.timestamp.desc()).all()
