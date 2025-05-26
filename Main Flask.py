@@ -145,26 +145,6 @@ class SubmissionFieldAnswer(db.Model):
     field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
     value = db.Column(db.String)
 
-class SubmissionTemplate(db.Model):
-    __tablename__ = 'submission_templates'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), nullable=False)    
-
-#Setting for submission
-class SubmissionSettings(db.Model):
-    __tablename__ = 'submissions_settings'
-    id = db.Column(db.Integer, primary_key=True)
-    template_id = db.Column(db.Integer)
-    due_date = db.Column(db.DateTime, nullable=False)
-    allow_late = db.Column(db.Boolean, default=False)
-    auto_close = db.Column(db.Boolean, default=False)
-    late_penalty_info = db.Column(db.Text)  # e.g. "10% deduction per day"
-
-class StudentCourse(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
-
 def get_course(course_id):
     course = db.session.get(Course, course_id)
     if course is None:
