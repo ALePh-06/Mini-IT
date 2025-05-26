@@ -401,7 +401,7 @@ def delete(id):
 @app.route('/StudentForm')
 def StudentForm():
     form = FormTemplate.query.first()  # Get any form
-    return render_template('SubmissionHistory.html', form=form)
+    return render_template('StudentForm.html', form=form)
 
 #Route to display available forms for students
 @app.route('/Student/AvailableForms')
@@ -625,9 +625,10 @@ def status():
         courses = Course.query.filter_by(lecturer_id=current_user.id).all()
         course_ids = [course.id for course in courses]
 
-        # Get all submissions related to those courses (assuming submissions link to course/group with course_id)
-        submissions = Submission.query.filter(Submission.course_id.in_(course_ids)).all()
 
+        submissions = []
+        if course_ids:  # Only query if there are course IDs
+            submissions = Submission.query.filter(Submission.course_id.in_(course_ids)).all()
         return render_template("status.html", submissions=submissions)
 
     else:
