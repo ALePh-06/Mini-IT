@@ -13,12 +13,13 @@ db_path = os.path.join(basedir, 'mydatabase.db')
 
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your secret key'
+app.config['SECRET_KEY'] = '#83yUi_a'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 
 
 db = SQLAlchemy(app)
@@ -39,6 +40,14 @@ class Users(db.Model):
     password = db.Column(db.String, nullable=False)
     user_type = db.Column(db.String, nullable=False)
 
+    group_id = db.Column(db.Integer, db.ForeignKey('Group.id'))
+
+class Group(db.Model):
+    __tablename__ = 'Group'
+    id = db.Column(db.Integer, primary_key=True)
+    
+    course = db.relationship
+
 class Course(db.Model):
     __tablename__ = 'courses'
     id = db.Column(db.Integer, primary_key=True)
@@ -46,6 +55,9 @@ class Course(db.Model):
     trimester = db.Column(db.Integer, nullable=False)
     code = db.Column(db.String, nullable=False)
     content = db.Column(db.String, nullable=False)
+
+    lecturer_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    lecturer = db.relationship('Users', backref='courses') 
 
 class Template(db.Model):
     __tablename__ = 'templates'
@@ -62,6 +74,44 @@ class TemplateField(db.Model):
 
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
 
+<<<<<<< HEAD
+=======
+class Submission(db.Model):
+    __tablename__ = 'submissions'
+    id = db.Column(db.Integer, primary_key=True)
+    group_name = db.Column(db.String(255), nullable=False)
+    title = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    filename = db.Column(db.String(255))
+    timestamp = db.Column(db.DateTime, default=malaysia_time)
+
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    user = db.relationship('Users', backref='submissions')
+    
+class SubmissionTemplate(db.Model):
+    __tablename__ = 'submission_templates'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)    
+
+#Setting for submission
+class SubmissionSettings(db.Model):
+    __tablename__ = 'submissions_settings'
+    id = db.Column(db.Integer, primary_key=True)
+    template_id = db.Column(db.Integer)
+    due_date = db.Column(db.DateTime, nullable=False)
+    allow_late = db.Column(db.Boolean, default=False)
+    auto_close = db.Column(db.Boolean, default=False)
+    late_penalty_info = db.Column(db.Text)  # e.g. "10% deduction per day"
+
+class SubmissionStatus(db.Model):
+    __tablename__ = 'submission_status'
+    id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False, primary_key=True)
+    team_id = db.Column(db.String, db.ForeignKey('submissions.team_id'), nullable=False)
+    lecturer_id = db.Column(db.Integer, db.ForeignKey('submissions.lecturer_id'), nullable=False)
+    status = db.Column(db.Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
+
+
+>>>>>>> c90f79f9f45d57c22648c10bd45a073f857dcde0
 def get_course(course_id):
     course = db.session.get(Course, course_id)
     if course is None:
@@ -73,11 +123,17 @@ def get_template(template_id):
         abort(404)
     return template
 
+<<<<<<< HEAD
+=======
+def get_submission(submission_id):
+    submission = db.session.get(Submission, submission_id)
+    if submission is None:
+        abort(404)
+    return submission
+
+>>>>>>> c90f79f9f45d57c22648c10bd45a073f857dcde0
 with app.app_context():
     db.create_all()
-
-# Adding app secret key
-app.secret_key = "#83yUi_a"
 
 @app.before_request
 def require_login():
@@ -170,6 +226,7 @@ def view_course(course_id):
 
 @app.route('/create_course', methods=('GET', 'POST'))
 def create_course():
+    current_user = Users.query.filter_by(username=session["username"]).first()
     if request.method == 'POST':
         title = request.form['title']
         trimester = request.form['trimester']
@@ -183,7 +240,7 @@ def create_course():
         elif not code:
             flash('Code is required!')
         else:
-            new_course = Course(title=title, trimester=int(trimester), code=code, content=content)
+            new_course = Course(title=title, trimester=int(trimester), code=code, content=content, lecturer_id=current_user.id)
             db.session.add(new_course)
             db.session.commit()
             return redirect(url_for('index'))
@@ -270,10 +327,11 @@ def delete(id):
     flash(f'Course "{course.title}" was successfully deleted!')
     return redirect(url_for('index'))
 
-#Naufal part
+#Naufal
 #Time zone
 def malaysia_time():
     return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
+<<<<<<< HEAD
 
 
 # Database Models
@@ -328,6 +386,9 @@ with app.app_context():
     db.create_all()
 
 #Routes to student form
+=======
+# Routes
+>>>>>>> c90f79f9f45d57c22648c10bd45a073f857dcde0
 @app.route('/StudentForm')
 def StudentForm():
     form = FormTemplate.query.first()  # Get any form
@@ -545,6 +606,30 @@ def lecturer():
     if session.get('user_type') != 'lecturer':
         return redirect(url_for('login'))  # or another page
     return render_template('LecturerForm.html')
+    if session['user_type'] == 'lecturer':
+        return render_template('LecturerForm.html')
+    
+@app.route('/Status')
+def status():
+    current_user = Users.query.filter_by(username=session["username"]).first()
+
+    if session['user_type'] == 'lecturer':
+        # Get all courses owned by this lecturer
+        courses = Course.query.filter_by(lecturer_id=current_user.id).all()
+        course_ids = [course.id for course in courses]
+
+        # Get all submissions related to those courses (assuming submissions link to course/group with course_id)
+        submissions = Submission.query.Filter_by(course_ids).all()
+
+        return render_template("status.html", submissions=submissions)
+
+    else:
+        # Show only submissions from this user's group
+        submissions = Submission.query.join(Users).filter(
+            Users.group_id == current_user.group_id
+        ).all()
+
+        return render_template("status_s.html", submissions=submissions)
 
 
 app.run(host="0.0.0.0", port=5000, debug=True)
