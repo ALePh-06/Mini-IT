@@ -7,6 +7,7 @@ from werkzeug.utils import secure_filename
 import os
 import bcrypt
 import pytz
+from pytz import timezone
 from datetime import datetime
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'mydatabase.db')
@@ -400,7 +401,7 @@ def delete(id):
 @app.route('/StudentForm')
 def StudentForm():
     form = FormTemplate.query.first()  # Get any form
-    return render_template('SubmissionHistory.html', form=form)
+    return render_template('StudentForm.html', form=form)
 
 #Route to display available forms for students
 @app.route('/Student/AvailableForms')
@@ -465,16 +466,16 @@ def create_form():
 #Route to handle student form submission
 @app.route('/submit', methods=['POST'])
 def submit():
-    if 'username' not in session: # Check if user is logged in
+    if 'username' not in session:  # Check if user is logged in
         flash("You must be logged in to submit.") 
         return redirect(url_for('login'))
 
-    user = Users.query.filter_by(username=session['username']).first() #Check if user exists
+    user = Users.query.filter_by(username=session['username']).first()  # Check if user exists
     if not user:
         flash("User not found.")
         return redirect(url_for('login'))
 
-    #Get form data
+    # Get form data
     group_name = request.form['Group_Name']
     title = request.form['Title']
     description = request.form['Description']
@@ -487,18 +488,32 @@ def submit():
 
     form_id = request.form.get('form_id')  
     due_date = None
+    form = None
 
-    #If form_id is provided, get the due date from the FormTemplate
+    # Convert form_id to integer safely and retrieve the form
     if form_id:
-        form = FormTemplate.query.get(form_id)
-        if form and form.due_date:
-            due_date = form.due_date
+        try:
+            form_id_int = int(form_id)
+            form = FormTemplate.query.get(form_id_int)
+            if form and form.due_date:
+                due_date = form.due_date
+        except ValueError:
+            flash("Invalid form ID.", "danger")
+            return redirect(url_for('StudentForm'))
+        
+        # Check if submission is late
+        now = malaysia_time()  # Timezone-aware
+        is_late = False
 
-    is_late = False
-    now = malaysia_time()
-    if due_date and now > due_date:
-        is_late = True
+        # Make due_date timezone-aware if it's not already
+        if due_date and due_date.tzinfo is None:
+            malaysia = timezone('Asia/Kuala_Lumpur')
+            due_date = malaysia.localize(due_date)
 
+        if due_date and now > due_date:
+            is_late = True
+
+    # Create and save submission
     new_submission = Submission(
         user_id=user.id,
         group_name=group_name,
@@ -514,7 +529,7 @@ def submit():
     db.session.commit()
 
     flash("Submission successful!", "success")
-    return redirect(url_for('student_forms'))
+    return redirect(url_for('StudentForm'))
 
 #Route to display submission history
 @app.route('/SubmissionHistory')
@@ -610,14 +625,12 @@ def download(filename):
 
 #Route for lecturer form
 @app.route('/LecturerForm')
-def lecturer():
-    if session.get('user_type') != 'lecturer':
-        return redirect(url_for('login'))  # or another page
+def LecturerForm():
+    if 'user_type' not in session or session['user_type'] != 'lecturer':
+        flash("Access denied: You must be a lecturer to view this page.", "danger")
+        return redirect(url_for('login'))  # Or a different page, like 'index'
+    
     return render_template('LecturerForm.html')
-
-
-    if session['user_type'] == 'lecturer':
-        return render_template('LecturerForm.html')
     
 @app.route('/Status')
 def status():
@@ -629,7 +642,7 @@ def status():
         course_ids = [course.id for course in courses]
 
         # Get all submissions related to those courses (assuming submissions link to course/group with course_id)
-        submissions = Submission.query.Filter_by(course_ids).all()
+        submissions = Submission.query.filter(Submission.course_id.in_(course_ids)).all()
 
         return render_template("status.html", submissions=submissions)
 
