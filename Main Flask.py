@@ -119,6 +119,57 @@ class StudentCourse(db.Model):
     course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
 
 
+#Naufal
+#Time zone
+def malaysia_time():
+    return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
+
+# Database Models
+class Submission(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    group_name = db.Column(db.String(255), nullable=False)
+    title = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    filename = db.Column(db.String(255))
+    timestamp = db.Column(db.DateTime, default=malaysia_time)
+    is_late = db.Column(db.Boolean, default=False)
+    due_date = db.Column(db.DateTime)
+    form_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=True)
+
+#FormTemplate
+class FormTemplate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255))
+    description = db.Column(db.Text)
+    filename = db.Column(db.String(255))
+    open_date = db.Column(db.DateTime)
+    due_date = db.Column(db.DateTime)
+
+    # Relationship to link form fields to form templates
+    fields = db.relationship('FormField', backref='form_template', lazy=True)
+    '''This line sets up a one-to-many relationship:
+        FormTemplate → has many → FormFields.
+        It allows you to access all fields in a form using form.fields.
+        Also, backref allows you to go back like reverse from FormField to FormTemplate using form_field.form_template.'''
+        
+        
+#Relationship to link submissions to form templates
+class FormField(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    form_template_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=False)
+    label = db.Column(db.String(255))  #Exp: "What is your name?"
+    field_type = db.Column(db.String(50))  #Exp: "text", "number", "file", etc.
+
+
+#Answer model to link submissions with form fields
+#For asnwer of course
+class SubmissionFieldAnswer(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    submission_id = db.Column(db.Integer, db.ForeignKey('submission.id'), nullable=False)
+    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
+    value = db.Column(db.String)
+
 def get_course(course_id):
     course = db.session.get(Course, course_id)
     if course is None:
@@ -138,11 +189,6 @@ def get_submission(submission_id):
 
 with app.app_context():
     db.create_all()
-
-# Muiz's codes
-
-# Adding app secret key
-app.secret_key = "#83yUi_a"
 
 @app.before_request
 def require_login():
@@ -368,62 +414,6 @@ def delete(id):
     db.session.commit()
     flash(f'Course "{course.title}" was successfully deleted!')
     return redirect(url_for('index'))
-
-#Naufal
-#Time zone
-def malaysia_time():
-    return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
-
-# Database Models
-class Submission(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    group_name = db.Column(db.String(255), nullable=False)
-    title = db.Column(db.Text, nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    filename = db.Column(db.String(255))
-    timestamp = db.Column(db.DateTime, default=malaysia_time)
-    is_late = db.Column(db.Boolean, default=False)
-    due_date = db.Column(db.DateTime)
-    form_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=True)
-
-#FormTemplate
-class FormTemplate(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(255))
-    description = db.Column(db.Text)
-    filename = db.Column(db.String(255))
-    open_date = db.Column(db.DateTime)
-    due_date = db.Column(db.DateTime)
-
-    # Relationship to link form fields to form templates
-    fields = db.relationship('FormField', backref='form_template', lazy=True)
-    '''This line sets up a one-to-many relationship:
-        FormTemplate → has many → FormFields.
-        It allows you to access all fields in a form using form.fields.
-        Also, backref allows you to go back like reverse from FormField to FormTemplate using form_field.form_template.'''
-        
-        
-#Relationship to link submissions to form templates
-class FormField(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    form_template_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=False)
-    label = db.Column(db.String(255))  #Exp: "What is your name?"
-    field_type = db.Column(db.String(50))  #Exp: "text", "number", "file", etc.
-
-
-#Answer model to link submissions with form fields
-#For asnwer of course
-class SubmissionFieldAnswer(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    submission_id = db.Column(db.Integer, db.ForeignKey('submission.id'), nullable=False)
-    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
-    value = db.Column(db.String)
-    
-
-#Create tables
-with app.app_context():
-    db.create_all()
 
 #Routes to student form
 @app.route('/StudentForm')
