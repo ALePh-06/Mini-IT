@@ -1,0 +1,16 @@
+<h2>Your Submission History</h2>
+{% for s in submissions %}
+    <div>
+        <h4>{{ s.title }}</h4>
+        <p>Description: {{ s.description }}</p>
+        <p>Group: {{ s.group_name }}</p>
+        <p>Submitted: {{ s.timestamp.strftime('%Y-%m-%d %H:%M') }}</p>
+        <p>Status: {% if s.is_late %}<span style="color:red">Late</span>{% else %}On time{% endif %}</p>
+        {% if s.filename %}
+            <a href="{{ url_for('static', filename='uploads/' ~ s.filename) }}" download>Download File</a>
+        {% endif %}
+    </div>
+    <hr>
+{% else %}
+    <p>No submissions found.</p>
+{% endfor %}
