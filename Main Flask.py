@@ -31,7 +31,12 @@ db = SQLAlchemy(app)
     except PermissionError:
         print("Database is in use. Close other processes using it first.")'''
 
-# SQLAlchemy models
+# SQLAlchemy models //////
+
+def malaysia_time():
+    return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
+
+
 
 class Users(db.Model):
     __tablename__ = 'users'
@@ -129,6 +134,11 @@ def get_submission(submission_id):
 with app.app_context():
     db.create_all()
 
+# Muiz's codes
+
+# Adding app secret key
+app.secret_key = "#83yUi_a"
+
 @app.before_request
 def require_login():
     allowed_routes = ['login', 'signup', 'static']
@@ -202,10 +212,43 @@ def signup():
 
     return render_template("Signup.html") # This is the render template!!!!!!!!!!!!!!!!!!!!#
 
+# Join course via code function
+@app.route('/JoinCourse', methods=['GET', 'POST'])
+def JoinCourse():
+    if 'user_type' not in session or session.get('user_type') != 'student':
+        flash('You must be logged in as a student to join courses.')
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        course_code = request.form['code'].strip()
+        student_id = session['user_type']
+        course = Course.query.filter_by(code=course_code).first()
+
+        if not course:
+            flash('Invalid course code.')
+            return redirect(url_for('JoinCourse'))
+
+        # Check if already joined
+        existing = StudentCourse.query.filter_by(student_id=student_id, course_id=course.id).first()
+        if existing:
+            flash('You have already joined this course.')
+            return redirect(url_for('JoinCourse'))
+
+        # Join course
+        join = StudentCourse(student_id=student_id, course_id=course.id)
+        db.session.add(join)
+        db.session.commit()
+        flash(f"You've successfully joined {course.title}.")
+        return redirect(url_for('index'))
+
+    return render_template('JoinCourse.html')
 
 @app.route('/')
 def index():
     courses = Course.query.all()
+
+    if 'user_type' not in session:
+        return redirect(url_for('login'))  # force login if not authenticated
     
     if session['user_type'] == 'lecturer':
         return render_template('Index.html', courses=courses)  # Create this template
