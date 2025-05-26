@@ -37,7 +37,6 @@ def malaysia_time():
     return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
 
 #User model
-
 class Users(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -125,7 +124,6 @@ class FormField(db.Model):
     label = db.Column(db.String(255))  #Exp: "What is your name?"
     field_type = db.Column(db.String(50))  #Exp: "text", "number", "file", etc.
 
-
 #Answer model to link submissions with form fields
 #For answer of course
 class SubmissionFieldAnswer(db.Model):
@@ -134,38 +132,28 @@ class SubmissionFieldAnswer(db.Model):
     submission_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False)
     field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
     value = db.Column(db.String)
-    
+ 
+ #SubmissionTemplate model   
 class SubmissionTemplate(db.Model):
     __tablename__ = 'submission_templates'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)    
 
-#Setting for submission
-class SubmissionSettings(db.Model):
-    __tablename__ = 'submissions_settings'
-    id = db.Column(db.Integer, primary_key=True)
-    template_id = db.Column(db.Integer)
-    due_date = db.Column(db.DateTime, nullable=False)
-    allow_late = db.Column(db.Boolean, default=False)
-    auto_close = db.Column(db.Boolean, default=False)
-    late_penalty_info = db.Column(db.Text)  # e.g. "10% deduction per day"
-
+#SubmissionStatus model
 class SubmissionStatus(db.Model):
     __tablename__ = 'submission_status'
-    id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False, primary_key=True)
+    id = db.Column(db.Integer, db.ForeignKey('submissionsgit.id'), nullable=False, primary_key=True)
     team_id = db.Column(db.String, nullable=False) #db.ForeignKey('submissions.team_id'), put here so don't forget
     lecturer_id = db.Column(db.Integer, db.ForeignKey('submissions.lecturer_id'), nullable=False)
     status = db.Column(db.Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
 
+#StudentCourse model
 class StudentCourse(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
-    
-#Create tables
-with app.app_context():
-    db.create_all()
 
+#Submission model
 class Submission(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
@@ -212,6 +200,10 @@ class SubmissionFieldAnswer(db.Model):
     submission_id = db.Column(db.Integer, db.ForeignKey('submission.id'), nullable=False)
     field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
     value = db.Column(db.String)
+    
+#Create tables
+with app.app_context():
+    db.create_all()
 
 def get_course(course_id):
     course = db.session.get(Course, course_id)
@@ -677,7 +669,6 @@ def lecturer():
     if session.get('user_type') != 'lecturer':
         return redirect(url_for('login'))  # or another page
     return render_template('LecturerForm.html')
-
 
     if session['user_type'] == 'lecturer':
         return render_template('LecturerForm.html')
