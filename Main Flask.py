@@ -306,12 +306,10 @@ def delete(id):
 
 #Naufal part
 #Time zone
-<<<<<<< HEAD
-=======
 def malaysia_time():
     return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
 
-
+ 
 # Database Models
 class Submission(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -337,7 +335,6 @@ class FormTemplate(db.Model):
 #Create tables
 with app.app_context():
     db.create_all()
->>>>>>> Naufal
 
 #Routes to student form
 @app.route('/StudentForm')
