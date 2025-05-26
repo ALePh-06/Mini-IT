@@ -1,0 +1,16 @@
+<h2>Review Submission from {{ submission.user.username }}</h2>
+<p><strong>Form:</strong> {{ submission.form.title }}</p>
+<p><strong>Submitted on:</strong> {{ submission.timestamp }}</p>
+
+<table>
+    <tr>
+        <th>Question</th>
+        <th>Answer</th>
+    </tr>
+    {% for pair in qa_pairs %}
+    <tr>
+        <td>{{ pair.question }}</td>
+        <td>{{ pair.answer }}</td>
+    </tr>
+    {% endfor %}
+</table>

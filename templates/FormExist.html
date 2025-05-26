@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Available Assignment Forms</title>
+    <style>
+        .form-card {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin: 15px;
+            border-radius: 10px;
+        }
+        .due-soon {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>Available Assignments</h1>
+    {% if forms %}
+        {% for form in forms %}
+            <div class="form-card">
+                <h2>{{ form.title }}</h2>
+                <p>{{ form.description }}</p>
+                    <p>
+                     <strong>Due Date:</strong>
+                        {% if form.due_date %}
+                            <span class="{{ 'due-soon' if form.due_date < malaysia_time() else '' }}">
+                                {{ form.due_date.strftime('%Y-%m-%d %H:%M') }}
+                            </span>
+                        {% else %}
+                            <span>No due date</span>
+                        {% endif %}
+                    </p>
+                </p>
+                {% if form.filename %}
+                    <a href="{{ url_for('download', filename=form.filename) }}" download>Download Attached File</a>
+                {% endif %}
+                <br><br>
+                <a href="{{ url_for('StudentForm', form_id=form.id) }}">Submit Your Assignment</a>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>No available forms at the moment.</p>
+    {% endif %}
+</body>
+</html>
