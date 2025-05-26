@@ -177,6 +177,11 @@ def signup():
 
     return render_template("Signup.html") # This is the render template!!!!!!!!!!!!!!!!!!!!#
 
+@app.route('/join_group')
+def join_group():
+    group = Users.query.all()
+    '''ni semua placeholder aje'''
+
 
 @app.route('/')
 def index():

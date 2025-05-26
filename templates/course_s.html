@@ -4,5 +4,8 @@
     <h2>{% block title %} {{ course['title'] }} {% endblock %}</h2>
     <span class="badge badge-primary">Trimester : {{ course['trimester'] }}</span>
     <p>Course code : {{ course['code'] }}</p>
+    <a href="{{ url_for('join_group', id=Group['id']) }}">
+        <span class="badge badge-warning">Join Group</span>
+    </a>
     <p>{{ course['content'] }}</p>
 {% endblock %}
