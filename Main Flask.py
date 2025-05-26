@@ -36,8 +36,7 @@ db = SQLAlchemy(app)
 def malaysia_time():
     return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
 
-
-
+#User model
 class Users(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -47,12 +46,14 @@ class Users(db.Model):
 
     group_id = db.Column(db.Integer, db.ForeignKey('Group.id'))
 
+#Group model
 class Group(db.Model):
     __tablename__ = 'Group'
     id = db.Column(db.Integer, primary_key=True)
     
     course = db.relationship
 
+#Course model
 class Course(db.Model):
     __tablename__ = 'courses'
     id = db.Column(db.Integer, primary_key=True)
@@ -64,6 +65,7 @@ class Course(db.Model):
     lecturer_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     lecturer = db.relationship('Users', backref='courses') 
 
+#Template model
 class Template(db.Model):
     __tablename__ = 'templates'
     id = db.Column(db.Integer, primary_key=True)
@@ -71,6 +73,7 @@ class Template(db.Model):
 
     fields = db.relationship('TemplateField', backref='template', cascade="all, delete-orphan")
 
+#TemplateField model
 class TemplateField(db.Model):
     __tablename__ = 'template_fields'
     id = db.Column(db.Integer, primary_key=True)
@@ -78,18 +81,58 @@ class TemplateField(db.Model):
     field_order = db.Column(db.Integer, nullable=False)
 
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
-
+    
+# Database Models
 class Submission(db.Model):
     __tablename__ = 'submissions'
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     group_name = db.Column(db.String(255), nullable=False)
     title = db.Column(db.Text, nullable=False)
     description = db.Column(db.Text, nullable=False)
     filename = db.Column(db.String(255))
     timestamp = db.Column(db.DateTime, default=malaysia_time)
-
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    is_late = db.Column(db.Boolean, default=False)
+    due_date = db.Column(db.DateTime)
+    form_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=True)
+    lecturer_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=True)
     user = db.relationship('Users', backref='submissions')
+
+#FormTemplate
+class FormTemplate(db.Model):
+    __tablename__ = 'form_template'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255))
+    description = db.Column(db.Text)
+    filename = db.Column(db.String(255))
+    open_date = db.Column(db.DateTime)
+    due_date = db.Column(db.DateTime)
+
+    # Relationship to link form fields to form templates
+    fields = db.relationship('FormField', backref='form_template', lazy=True)
+    '''This line sets up a one-to-many relationship:
+        FormTemplate > has many > FormFields.
+        It allows you to access all fields in a form using form.fields.
+        Also, backref allows you to go back like reverse from FormField to FormTemplate using form_field.form_template.'''
+        
+        
+#Relationship to link submissions to form templates
+class FormField(db.Model):
+    __tablename__ = 'form_field'
+    id = db.Column(db.Integer, primary_key=True)
+    form_template_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=False)
+    label = db.Column(db.String(255))  #Exp: "What is your name?"
+    field_type = db.Column(db.String(50))  #Exp: "text", "number", "file", etc.
+
+
+#Answer model to link submissions with form fields
+#For answer of course
+class SubmissionFieldAnswer(db.Model):
+    __tablename__ = 'submission_field_answer'
+    id = db.Column(db.Integer, primary_key=True)
+    submission_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False)
+    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
+    value = db.Column(db.String)
     
 class SubmissionTemplate(db.Model):
     __tablename__ = 'submission_templates'
@@ -109,14 +152,18 @@ class SubmissionSettings(db.Model):
 class SubmissionStatus(db.Model):
     __tablename__ = 'submission_status'
     id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False, primary_key=True)
-    team_id = db.Column(db.String, db.ForeignKey('submissions.team_id'), nullable=False)
+    team_id = db.Column(db.String, nullable=False) #db.ForeignKey('submissions.team_id'), put here so don't forget
     lecturer_id = db.Column(db.Integer, db.ForeignKey('submissions.lecturer_id'), nullable=False)
     status = db.Column(db.Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
 
 class StudentCourse(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+    
+#Create tables
+with app.app_context():
+    db.create_all()
 
 
 def get_course(course_id):
@@ -136,8 +183,6 @@ def get_submission(submission_id):
         abort(404)
     return submission
 
-with app.app_context():
-    db.create_all()
 
 # Muiz's codes
 
@@ -370,66 +415,12 @@ def delete(id):
     return redirect(url_for('index'))
 
 #Naufal
-#Time zone
-def malaysia_time():
-    return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
-
-# Database Models
-class Submission(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    group_name = db.Column(db.String(255), nullable=False)
-    title = db.Column(db.Text, nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    filename = db.Column(db.String(255))
-    timestamp = db.Column(db.DateTime, default=malaysia_time)
-    is_late = db.Column(db.Boolean, default=False)
-    due_date = db.Column(db.DateTime)
-    form_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=True)
-
-#FormTemplate
-class FormTemplate(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(255))
-    description = db.Column(db.Text)
-    filename = db.Column(db.String(255))
-    open_date = db.Column(db.DateTime)
-    due_date = db.Column(db.DateTime)
-
-    # Relationship to link form fields to form templates
-    fields = db.relationship('FormField', backref='form_template', lazy=True)
-    '''This line sets up a one-to-many relationship:
-        FormTemplate → has many → FormFields.
-        It allows you to access all fields in a form using form.fields.
-        Also, backref allows you to go back like reverse from FormField to FormTemplate using form_field.form_template.'''
-        
-        
-#Relationship to link submissions to form templates
-class FormField(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    form_template_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=False)
-    label = db.Column(db.String(255))  #Exp: "What is your name?"
-    field_type = db.Column(db.String(50))  #Exp: "text", "number", "file", etc.
-
-
-#Answer model to link submissions with form fields
-#For asnwer of course
-class SubmissionFieldAnswer(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    submission_id = db.Column(db.Integer, db.ForeignKey('submission.id'), nullable=False)
-    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
-    value = db.Column(db.String)
-    
-
-#Create tables
-with app.app_context():
-    db.create_all()
 
 #Routes to student form
 @app.route('/StudentForm')
 def StudentForm():
     form = FormTemplate.query.first()  # Get any form
-    return render_template('SubmissionHistory.html', form=form)
+    return render_template('StudentForm.html', form=form)
 
 #Route to display available forms for students
 @app.route('/Student/AvailableForms')
@@ -603,7 +594,7 @@ def review_submission(submission_id):
     if session.get('user_type') != 'lecturer':
         abort(403)
 
-    form_fields = FormTemplate.query.filter_by(form_id=submission.form_id).order_by(FormTemplate.id).all()
+    form_fields = FormField.query.filter_by(form_template_id=submission.form_id).order_by(FormField.id).all()
     answers = SubmissionFieldAnswer.query.filter_by(submission_id=submission.id).order_by(SubmissionFieldAnswer.field_id).all()
 
 

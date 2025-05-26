@@ -25,14 +25,14 @@ db = SQLAlchemy(app)
 def malaysia_time():
     return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
 
-# Define database model
-class Submission(db.Model):
+# Define database model (I'm going to crucify thy code)
+"""class Submission(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     group_name = db.Column(db.String(255), nullable=False) # Nullable means this column is required (can’t be empty), if true it meant optional
     title = db.Column(db.Text, nullable=False)
     description = db.Column(db.Text, nullable=False)
     filename = db.Column(db.String(255))
-    timestamp = db.Column(db.DateTime, default=malaysia_time)
+    timestamp = db.Column(db.DateTime, default=malaysia_time)"""
     
 class SubmissionTemplate(db.Model):
     id = db.Column(db.Integer, primary_key=True)
