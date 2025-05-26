@@ -8,8 +8,6 @@ import os
 import bcrypt
 import pytz
 from datetime import datetime
-from sqlalchemy import Enum, Column, Integer, String, DateTime, Boolean, ForeignKey, Text
-from sqlalchemy.orm import relationship, sessionmaker
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'mydatabase.db')
 
@@ -38,64 +36,78 @@ def malaysia_time():
 
 class Users(db.Model):
     __tablename__ = 'users'
-    id = Column(Integer, primary_key=True)
-    username = Column(String, unique=True, nullable=False)
-    password = Column(String, nullable=False)
-    user_type = Column(String, nullable=False)
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String, unique=True, nullable=False)
+    password = db.Column(db.String, nullable=False)
+    user_type = db.Column(db.String, nullable=False)
+
+    group_id = db.Column(db.Integer, db.ForeignKey('Group.id'))
+
+class Group(db.Model):
+    __tablename__ = 'Group'
+    id = db.Column(db.Integer, primary_key=True)
+    
+    course = db.relationship
 
 class Course(db.Model):
     __tablename__ = 'courses'
-    id = Column(Integer, primary_key=True)
-    title = Column(String, nullable=False)
-    trimester = Column(Integer, nullable=False)
-    code = Column(String, nullable=False)
-    content = Column(String, nullable=False)
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String, nullable=False)
+    trimester = db.Column(db.Integer, nullable=False)
+    code = db.Column(db.String, nullable=False)
+    content = db.Column(db.String, nullable=False)
+
+    lecturer_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    lecturer = db.relationship('Users', backref='courses') 
 
 class Template(db.Model):
     __tablename__ = 'templates'
-    id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, nullable=False)
 
     fields = db.relationship('TemplateField', backref='template', cascade="all, delete-orphan")
 
 class TemplateField(db.Model):
     __tablename__ = 'template_fields'
-    id = Column(Integer, primary_key=True)
-    field_name = Column(String, nullable=False)
-    field_order = Column(Integer, nullable=False)
+    id = db.Column(db.Integer, primary_key=True)
+    field_name = db.Column(db.String, nullable=False)
+    field_order = db.Column(db.Integer, nullable=False)
 
-    template_id = Column(Integer, db.ForeignKey('templates.id'), nullable=False)
+    template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
 
 class Submission(db.Model):
     __tablename__ = 'submissions'
-    id = Column(Integer, primary_key=True)
-    group_name = Column(String(255), nullable=False) # Nullable means this column is required (can’t be empty), if true it meant optional
-    title = Column(Text, nullable=False)
-    description = Column(Text, nullable=False)
-    filename = Column(String(255))
-    timestamp = Column(DateTime, default=malaysia_time)
+    id = db.Column(db.Integer, primary_key=True)
+    group_name = db.Column(db.String(255), nullable=False)
+    title = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    filename = db.Column(db.String(255))
+    timestamp = db.Column(db.DateTime, default=malaysia_time)
+
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    user = db.relationship('Users', backref='submissions')
     
 class SubmissionTemplate(db.Model):
     __tablename__ = 'submission_templates'
-    id = Column(Integer, primary_key=True)
-    name = Column(String(255), nullable=False)    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)    
 
 #Setting for submission
 class SubmissionSettings(db.Model):
     __tablename__ = 'submissions_settings'
-    id = Column(Integer, primary_key=True)
-    template_id = Column(Integer)
-    due_date = Column(DateTime, nullable=False)
-    allow_late = Column(Boolean, default=False)
-    auto_close = Column(Boolean, default=False)
-    late_penalty_info = Column(Text)  # e.g. "10% deduction per day"
+    id = db.Column(db.Integer, primary_key=True)
+    template_id = db.Column(db.Integer)
+    due_date = db.Column(db.DateTime, nullable=False)
+    allow_late = db.Column(db.Boolean, default=False)
+    auto_close = db.Column(db.Boolean, default=False)
+    late_penalty_info = db.Column(db.Text)  # e.g. "10% deduction per day"
 
 class SubmissionStatus(db.Model):
     __tablename__ = 'submission_status'
-    id = Column(Integer, ForeignKey('submissions.id'), nullable=False, primary_key=True)
-    team_id = Column(String, ForeignKey('submissions.team_id'), nullable=False)
-    lecturer_id = Column(Integer, ForeignKey('submissions.lecturer_id'), nullable=False)
-    status = Column(Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
+    id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False, primary_key=True)
+    team_id = db.Column(db.String, db.ForeignKey('submissions.team_id'), nullable=False)
+    lecturer_id = db.Column(db.Integer, db.ForeignKey('submissions.lecturer_id'), nullable=False)
+    status = db.Column(db.Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
 
 
 def get_course(course_id):
@@ -209,6 +221,7 @@ def view_course(course_id):
 
 @app.route('/create_course', methods=('GET', 'POST'))
 def create_course():
+    current_user = Users.query.filter_by(username=session["username"]).first()
     if request.method == 'POST':
         title = request.form['title']
         trimester = request.form['trimester']
@@ -222,7 +235,7 @@ def create_course():
         elif not code:
             flash('Code is required!')
         else:
-            new_course = Course(title=title, trimester=int(trimester), code=code, content=content)
+            new_course = Course(title=title, trimester=int(trimester), code=code, content=content, lecturer_id=current_user.id)
             db.session.add(new_course)
             db.session.commit()
             return redirect(url_for('index'))
@@ -386,8 +399,26 @@ def lecturer():
         return render_template('LecturerForm.html')
     
 @app.route('/Status')
-def Status():
-    submissions = session.query(Submission).filter(Submission.ID)
+def status():
+    current_user = Users.query.filter_by(username=session["username"]).first()
+
+    if session['user_type'] == 'lecturer':
+        # Get all courses owned by this lecturer
+        courses = Course.query.filter_by(lecturer_id=current_user.id).all()
+        course_ids = [course.id for course in courses]
+
+        # Get all submissions related to those courses (assuming submissions link to course/group with course_id)
+        submissions = Submission.query.Filter_by(course_ids).all()
+
+        return render_template("status.html", submissions=submissions)
+
+    else:
+        # Show only submissions from this user's group
+        submissions = Submission.query.join(Users).filter(
+            Users.group_id == current_user.group_id
+        ).all()
+
+        return render_template("status_s.html", submissions=submissions)
 
 
 
