@@ -79,6 +79,8 @@ class TemplateField(db.Model):
 
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
 
+<<<<<<< HEAD
+=======
 class Submission(db.Model):
     __tablename__ = 'submissions'
     id = db.Column(db.Integer, primary_key=True)
@@ -113,17 +115,6 @@ class SubmissionStatus(db.Model):
     lecturer_id = db.Column(db.Integer, db.ForeignKey('submissions.lecturer_id'), nullable=False)
     status = db.Column(db.Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
 
-# Relation students with courses after joined
-class StudentCourse(db.Model):
-    __tablename__ = 'student_courses'
-    id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
-
-    student = db.relationship('Users', backref='joined_courses')
-    course = db.relationship('Course', backref='students_joined')
-
-# End of borderline ////
 
 def get_course(course_id):
     course = db.session.get(Course, course_id)
@@ -136,12 +127,15 @@ def get_template(template_id):
         abort(404)
     return template
 
+<<<<<<< HEAD
+=======
 def get_submission(submission_id):
     submission = db.session.get(Submission, submission_id)
     if submission is None:
         abort(404)
     return submission
 
+>>>>>>> c90f79f9f45d57c22648c10bd45a073f857dcde0
 with app.app_context():
     db.create_all()
 
@@ -379,7 +373,64 @@ def delete(id):
 #Time zone
 def malaysia_time():
     return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
+<<<<<<< HEAD
+
+
+# Database Models
+class Submission(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    group_name = db.Column(db.String(255), nullable=False)
+    title = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    filename = db.Column(db.String(255))
+    timestamp = db.Column(db.DateTime, default=malaysia_time)
+    is_late = db.Column(db.Boolean, default=False)
+    due_date = db.Column(db.DateTime)
+    form_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=True)
+
+#FormTemplate
+class FormTemplate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255))
+    description = db.Column(db.Text)
+    filename = db.Column(db.String(255))
+    open_date = db.Column(db.DateTime)
+    due_date = db.Column(db.DateTime)
+
+    # Relationship to link form fields to form templates
+    fields = db.relationship('FormField', backref='form_template', lazy=True)
+    '''This line sets up a one-to-many relationship:
+        FormTemplate → has many → FormFields.
+        It allows you to access all fields in a form using form.fields.
+        Also, backref allows you to go back like reverse from FormField to FormTemplate using form_field.form_template.'''
+        
+        
+#Relationship to link submissions to form templates
+class FormField(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    form_template_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=False)
+    label = db.Column(db.String(255))  #Exp: "What is your name?"
+    field_type = db.Column(db.String(50))  #Exp: "text", "number", "file", etc.
+
+
+#Answer model to link submissions with form fields
+#For asnwer of course
+class SubmissionFieldAnswer(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    submission_id = db.Column(db.Integer, db.ForeignKey('submission.id'), nullable=False)
+    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
+    value = db.Column(db.String)
+    
+
+#Create tables
+with app.app_context():
+    db.create_all()
+
+#Routes to student form
+=======
 # Routes
+>>>>>>> c90f79f9f45d57c22648c10bd45a073f857dcde0
 @app.route('/StudentForm')
 def StudentForm():
     form = FormTemplate.query.first()  # Get any form
@@ -558,7 +609,8 @@ def review_submission(submission_id):
         abort(403)
 
     form_fields = FormTemplate.query.filter_by(form_id=submission.form_id).order_by(FormTemplate.id).all()
-    answers = submission.query.filter_by(submission_id=submission.id).order_by(submission.field_id).all()
+    answers = SubmissionFieldAnswer.query.filter_by(submission_id=submission.id).order_by(SubmissionFieldAnswer.field_id).all()
+
 
     #Pair up questions and answers
     qa_pairs = []
