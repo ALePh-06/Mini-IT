@@ -37,6 +37,7 @@ def malaysia_time():
     return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
 
 #User model
+
 class Users(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -165,12 +166,59 @@ class StudentCourse(db.Model):
 with app.app_context():
     db.create_all()
 
+class Submission(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    group_name = db.Column(db.String(255), nullable=False)
+    title = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    filename = db.Column(db.String(255))
+    timestamp = db.Column(db.DateTime, default=malaysia_time)
+    is_late = db.Column(db.Boolean, default=False)
+    due_date = db.Column(db.DateTime)
+    form_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=True)
+    lecturer_id = db.Column(db.Integer, db.ForeignKey('submissions.lecturer_id'), nullable=False)
+    status = db.Column(db.Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
+
+#FormTemplate
+class FormTemplate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255))
+    description = db.Column(db.Text)
+    filename = db.Column(db.String(255))
+    open_date = db.Column(db.DateTime)
+    due_date = db.Column(db.DateTime)
+
+    # Relationship to link form fields to form templates
+    fields = db.relationship('FormField', backref='form_template', lazy=True)
+    '''This line sets up a one-to-many relationship:
+        FormTemplate → has many → FormFields.
+        It allows you to access all fields in a form using form.fields.
+        Also, backref allows you to go back like reverse from FormField to FormTemplate using form_field.form_template.'''
+        
+        
+#Relationship to link submissions to form templates
+class FormField(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    form_template_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=False)
+    label = db.Column(db.String(255))  #Exp: "What is your name?"
+    field_type = db.Column(db.String(50))  #Exp: "text", "number", "file", etc.
+
+
+#Answer model to link submissions with form fields
+#For asnwer of course
+class SubmissionFieldAnswer(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    submission_id = db.Column(db.Integer, db.ForeignKey('submission.id'), nullable=False)
+    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
+    value = db.Column(db.String)
 
 def get_course(course_id):
     course = db.session.get(Course, course_id)
     if course is None:
         abort(404)
     return course
+
 def get_template(template_id):
     template = db.session.get(Template, template_id)
     if template is None:
@@ -183,11 +231,6 @@ def get_submission(submission_id):
         abort(404)
     return submission
 
-
-# Muiz's codes
-
-# Adding app secret key
-app.secret_key = "#83yUi_a"
 
 @app.before_request
 def require_login():
@@ -306,7 +349,7 @@ def index():
         return render_template('Index_s.html', courses=courses)
     
 
-@app.route('/<int:course_id>')
+@app.route('/course/<int:course_id>')
 def view_course(course_id):
     course = get_course(course_id)
     return render_template('view_course.html', course=course)
@@ -635,6 +678,7 @@ def lecturer():
         return redirect(url_for('login'))  # or another page
     return render_template('LecturerForm.html')
 
+
     if session['user_type'] == 'lecturer':
         return render_template('LecturerForm.html')
     
@@ -660,5 +704,23 @@ def status():
 
         return render_template("status_s.html", submissions=submissions)
 
+@app.route('/viewsubmission/<int:submission_id>')
+def view_submission(submission_id):
+    submission = get_submission(submission_id)
+    if session['user_type'] == 'lecturer':
+        return render_template('view_submission.html', submission=submission)
+    
+    else:
+        return render_template('view_submission_s.html', submission=submission)
+    
+@app.route("/update_status/<int:submission_id>", methods=["POST"])
+def update_status(submission_id):
+    new_status = request.form["status"]
+    submission = get_submission(submission_id)
+    submission.status = new_status
+    db.session.commit()
+
+    flash("Submission status updated.")
+    return redirect(url_for("view_submission", submission_id=submission.id))
 
 app.run(host="0.0.0.0", port=5000, debug=True)
