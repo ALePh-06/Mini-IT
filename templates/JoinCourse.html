@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+
+{% extends "base_s.html" %}
+
+{% block title %}Join Course{% endblock %}
+
+{% block content %}
+  <div class="mt-5">
+    <h2>Join a Course</h2>
+    <form method="POST">
+      <div class="form-group">
+        <label for="course_code">Enter Course Code:</label>
+        <input type="text" class="form-control" id="course_code" name="course_code" placeholder="e.g., CS101" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Join Course</button>
+    </form>
+  </div>
+{% endblock %}
