@@ -13,9 +13,14 @@ db_path = os.path.join(basedir, 'mydatabase.db')
 
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your secret key'
+app.config['SECRET_KEY'] = '#83yUi_a'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
 
 db = SQLAlchemy(app)
 
@@ -40,6 +45,14 @@ class Users(db.Model):
     password = db.Column(db.String, nullable=False)
     user_type = db.Column(db.String, nullable=False)
 
+    group_id = db.Column(db.Integer, db.ForeignKey('Group.id'))
+
+class Group(db.Model):
+    __tablename__ = 'Group'
+    id = db.Column(db.Integer, primary_key=True)
+    
+    course = db.relationship
+
 class Course(db.Model):
     __tablename__ = 'courses'
     id = db.Column(db.Integer, primary_key=True)
@@ -47,6 +60,9 @@ class Course(db.Model):
     trimester = db.Column(db.Integer, nullable=False)
     code = db.Column(db.String, nullable=False)
     content = db.Column(db.String, nullable=False)
+
+    lecturer_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    lecturer = db.relationship('Users', backref='courses') 
 
 class Template(db.Model):
     __tablename__ = 'templates'
@@ -64,25 +80,38 @@ class TemplateField(db.Model):
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
 
 class Submission(db.Model):
+    __tablename__ = 'submissions'
     id = db.Column(db.Integer, primary_key=True)
-    group_name = db.Column(db.String(255), nullable=False) # Nullable means this column is required (can’t be empty), if true it meant optional
+    group_name = db.Column(db.String(255), nullable=False)
     title = db.Column(db.Text, nullable=False)
     description = db.Column(db.Text, nullable=False)
     filename = db.Column(db.String(255))
     timestamp = db.Column(db.DateTime, default=malaysia_time)
+
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    user = db.relationship('Users', backref='submissions')
     
 class SubmissionTemplate(db.Model):
+    __tablename__ = 'submission_templates'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)    
 
 #Setting for submission
 class SubmissionSettings(db.Model):
+    __tablename__ = 'submissions_settings'
     id = db.Column(db.Integer, primary_key=True)
     template_id = db.Column(db.Integer)
     due_date = db.Column(db.DateTime, nullable=False)
     allow_late = db.Column(db.Boolean, default=False)
     auto_close = db.Column(db.Boolean, default=False)
     late_penalty_info = db.Column(db.Text)  # e.g. "10% deduction per day"
+
+class SubmissionStatus(db.Model):
+    __tablename__ = 'submission_status'
+    id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False, primary_key=True)
+    team_id = db.Column(db.String, db.ForeignKey('submissions.team_id'), nullable=False)
+    lecturer_id = db.Column(db.Integer, db.ForeignKey('submissions.lecturer_id'), nullable=False)
+    status = db.Column(db.Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
 
 # Relation students with courses after joined
 class StudentCourse(db.Model):
@@ -107,6 +136,11 @@ def get_template(template_id):
         abort(404)
     return template
 
+def get_submission(submission_id):
+    submission = db.session.get(Submission, submission_id)
+    if submission is None:
+        abort(404)
+    return submission
 
 with app.app_context():
     db.create_all()
@@ -240,6 +274,7 @@ def view_course(course_id):
 
 @app.route('/create_course', methods=('GET', 'POST'))
 def create_course():
+    current_user = Users.query.filter_by(username=session["username"]).first()
     if request.method == 'POST':
         title = request.form['title']
         trimester = request.form['trimester']
@@ -253,7 +288,7 @@ def create_course():
         elif not code:
             flash('Code is required!')
         else:
-            new_course = Course(title=title, trimester=int(trimester), code=code, content=content)
+            new_course = Course(title=title, trimester=int(trimester), code=code, content=content, lecturer_id=current_user.id)
             db.session.add(new_course)
             db.session.commit()
             return redirect(url_for('index'))
@@ -342,84 +377,249 @@ def delete(id):
 
 #Naufal
 #Time zone
-
+def malaysia_time():
+    return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
 # Routes
 @app.route('/StudentForm')
 def StudentForm():
-    return render_template('StudentForm.html')
+    form = FormTemplate.query.first()  # Get any form
+    return render_template('SubmissionHistory.html', form=form)
 
+#Route to display available forms for students
+@app.route('/Student/AvailableForms')
+def student_forms():
+    now = malaysia_time()
+    malaysia_tz = pytz.timezone('Asia/Kuala_Lumpur')
+    forms = FormTemplate.query.order_by(FormTemplate.due_date).all()
+
+    #Localize any naive due_date
+    for form in forms:
+        if form.due_date and form.due_date.tzinfo is None:
+            form.due_date = malaysia_tz.localize(form.due_date)
+
+    return render_template('FormExist.html', forms=forms, malaysia_time=malaysia_time)
+
+#Route to display lecturer form creation page
+@app.route('/create_form', methods=['POST'])
+def create_form():
+    title = request.form['Title']
+    description = request.form['Description']
+    file = request.files.get('Upload_file')
+    open_date_str = request.form.get('open_date')
+    due_date_str = request.form.get('due_date')
+    
+    due_date = None
+    open_date = None
+    
+    try:
+        if open_date_str:
+            open_date = datetime.strptime(open_date_str, "%Y-%m-%dT%H:%M")
+        if due_date_str:
+            due_date = datetime.strptime(due_date_str, "%Y-%m-%dT%H:%M")
+    except ValueError:
+        flash("Invalid date format.", "error")
+        return redirect(url_for('lecturer'))
+    
+    filename = None
+    if file:
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+ #Define Malaysia timezone and localize the datetime
+    malaysia_tz = pytz.timezone('Asia/Kuala_Lumpur')
+    if open_date:
+        open_date = malaysia_tz.localize(open_date)
+    if due_date:
+        due_date = malaysia_tz.localize(due_date)
+        
+    new_form = FormTemplate(
+        title=title,
+        description=description,
+        filename=filename,
+        open_date=open_date,
+        due_date=due_date
+    )
+    db.session.add(new_form)
+    db.session.commit()
+
+    flash("Form created successfully!", "success")
+    return render_template('LecturerForm.html')
+
+#Route to handle student form submission
 @app.route('/submit', methods=['POST'])
 def submit():
+    if 'username' not in session: # Check if user is logged in
+        flash("You must be logged in to submit.") 
+        return redirect(url_for('login'))
+
+    user = Users.query.filter_by(username=session['username']).first() #Check if user exists
+    if not user:
+        flash("User not found.")
+        return redirect(url_for('login'))
+
+    #Get form data
     group_name = request.form['Group_Name']
     title = request.form['Title']
     description = request.form['Description']
     file = request.files.get('Upload_file')
-    topics = request.form.getlist('Topics[]')
 
     filename = None
-    if file and file.filename:
+    if file:
         filename = secure_filename(file.filename)
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-    
-    #topics = request.form.getlist('Topics[]')
-    #subtopics = request.form.getlist('Subtopics[]')
-    
-    print("Submitted topics:", topics)  # for debug
 
-    # Insert into database
+    form_id = request.form.get('form_id')  
+    due_date = None
+
+    #If form_id is provided, get the due date from the FormTemplate
+    if form_id:
+        form = FormTemplate.query.get(form_id)
+        if form and form.due_date:
+            due_date = form.due_date
+
+    is_late = False
+    now = malaysia_time()
+    if due_date and now > due_date:
+        is_late = True
+
     new_submission = Submission(
-    group_name=group_name,
-    title=title,
-    description=description,
-    filename=filename,
-    timestamp=malaysia_time()
-)
-    
-    print("Saving file:", filename)
-    print("Saving to DB:", group_name, title, description, filename, malaysia_time())
+        user_id=user.id,
+        group_name=group_name,
+        title=title,
+        description=description,
+        filename=filename,
+        timestamp=now,
+        is_late=is_late,
+        due_date=due_date
+    )
 
-    try:
-        db.session.add(new_submission)
-        db.session.commit()
-        print("Saved to database!")
-    except Exception as e:
-        db.session.rollback()  # THIS IS IMPORTANT
-        print("Database error:", e)
+    db.session.add(new_submission)
+    db.session.commit()
 
-    rows = db.session.query(Submission).count()
-    print("Rows in DB:", rows)
-    
-    print(group_name, title, description, filename)
+    flash("Submission successful!", "success")
+    return redirect(url_for('student_forms'))
 
-    return redirect(url_for('StudentForm'))
-
+#Route to display submission history
 @app.route('/SubmissionHistory')
 def history():
-    selected_group = request.args.get('group_name')
+    user_type = session.get('user_type')
+    username = session.get('username')
     
-    if selected_group:
-        submissions = Submission.query.filter_by(group_name=selected_group).order_by(Submission.timestamp.desc()).all()
-    else:
-        submissions = Submission.query.order_by(Submission.timestamp.desc()).all()
+    if not username:
+        flash("Please log in.")
+        return redirect(url_for('login'))
+    
+    user = Users.query.filter_by(username=username).first()
+    if not user:
+        flash("User not found.")
+        return redirect(url_for('login'))
 
-    group_names = db.session.query(Submission.group_name).distinct().all()
-    group_names = [g[0] for g in group_names]
+    #Get list of distinct group names for filter dropdown (if any)
+    group_names = [g[0] for g in db.session.query(Submission.group_name).distinct().all()]
+    
+    if user_type == 'lecturer':
+        selected_group = request.args.get('group_name')
+
+        #Get all user_ids for students
+        student_ids = [u.id for u in Users.query.filter_by(user_type='student').all()]
+
+        if selected_group:
+            submissions = Submission.query.filter(
+                Submission.group_name == selected_group,
+                Submission.user_id.in_(student_ids)
+            ).order_by(Submission.timestamp.desc()).all()
+        else:
+            submissions = Submission.query.filter(
+                Submission.user_id.in_(student_ids)
+            ).order_by(Submission.timestamp.desc()).all()
+    
+    elif user_type == 'student':
+        #Student sees only their own submissions
+        submissions = Submission.query.filter_by(user_id=user.id).order_by(Submission.timestamp.desc()).all()
+        selected_group = None
+    
+    else:
+        submissions = []
+        selected_group = None
 
     return render_template('SubmissionHistory.html',
                            submissions=submissions,
                            group_names=group_names,
-                           selected_group=selected_group,
-                           )
-    
+                           selected_group=selected_group)
+
+
+#Route to review a submission
+@app.route('/review/<int:submission_id>')
+def review_submission(submission_id):
+    submission = Submission.query.get_or_404(submission_id)
+
+    #Optionally: restrict access to lecturers only
+    if session.get('user_type') != 'lecturer':
+        abort(403)
+
+    form_fields = FormTemplate.query.filter_by(form_id=submission.form_id).order_by(FormTemplate.id).all()
+    answers = submission.query.filter_by(submission_id=submission.id).order_by(submission.field_id).all()
+
+    #Pair up questions and answers
+    qa_pairs = []
+    for field in form_fields:
+        answer = next((a for a in answers if a.field_id == field.id), None)
+        qa_pairs.append({
+            'question': field.label,
+            'answer': answer.value if answer else 'N/A'
+        })
+
+    return render_template('ReviewSubmission.html', submission=submission, qa_pairs=qa_pairs)
+
+#Route for student history
+@app.route('/StudentHistory')
+def student_history():
+    if 'username' not in session:
+        flash("Please log in to view your submission history.")
+        return redirect(url_for('login'))
+
+    user = Users.query.filter_by(username=session['username']).first()
+    if user.user_type != "student":
+        abort(403)  # Only students should access this page
+
+    submissions = Submission.query.filter_by(user_id=user.id).order_by(Submission.timestamp.desc()).all()
+    return render_template("StudentHistory.html", submissions=submissions)
+
+#Route to download a file
 @app.route('/download/<filename>')
 def download(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)   
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
 
+#Route for lecturer form
 @app.route('/LecturerForm')
 def lecturer():
+    if session.get('user_type') != 'lecturer':
+        return redirect(url_for('login'))  # or another page
+    return render_template('LecturerForm.html')
     if session['user_type'] == 'lecturer':
         return render_template('LecturerForm.html')
+    
+@app.route('/Status')
+def status():
+    current_user = Users.query.filter_by(username=session["username"]).first()
 
+    if session['user_type'] == 'lecturer':
+        # Get all courses owned by this lecturer
+        courses = Course.query.filter_by(lecturer_id=current_user.id).all()
+        course_ids = [course.id for course in courses]
+
+        # Get all submissions related to those courses (assuming submissions link to course/group with course_id)
+        submissions = Submission.query.Filter_by(course_ids).all()
+
+        return render_template("status.html", submissions=submissions)
+
+    else:
+        # Show only submissions from this user's group
+        submissions = Submission.query.join(Users).filter(
+            Users.group_id == current_user.group_id
+        ).all()
+
+        return render_template("status_s.html", submissions=submissions)
 
 
 app.run(host="0.0.0.0", port=5000, debug=True)
