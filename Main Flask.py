@@ -79,8 +79,7 @@ class TemplateField(db.Model):
 
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
 
-<<<<<<< HEAD
-=======
+
 class Submission(db.Model):
     __tablename__ = 'submissions'
     id = db.Column(db.Integer, primary_key=True)
@@ -115,6 +114,11 @@ class SubmissionStatus(db.Model):
     lecturer_id = db.Column(db.Integer, db.ForeignKey('submissions.lecturer_id'), nullable=False)
     status = db.Column(db.Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
 
+class StudentCourse(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
+
 
 def get_course(course_id):
     course = db.session.get(Course, course_id)
@@ -127,15 +131,14 @@ def get_template(template_id):
         abort(404)
     return template
 
-<<<<<<< HEAD
-=======
+
 def get_submission(submission_id):
     submission = db.session.get(Submission, submission_id)
     if submission is None:
         abort(404)
     return submission
 
->>>>>>> c90f79f9f45d57c22648c10bd45a073f857dcde0
+
 with app.app_context():
     db.create_all()
 
@@ -373,7 +376,6 @@ def delete(id):
 #Time zone
 def malaysia_time():
     return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
-<<<<<<< HEAD
 
 
 # Database Models
@@ -428,9 +430,9 @@ with app.app_context():
     db.create_all()
 
 #Routes to student form
-=======
+
 # Routes
->>>>>>> c90f79f9f45d57c22648c10bd45a073f857dcde0
+
 @app.route('/StudentForm')
 def StudentForm():
     form = FormTemplate.query.first()  # Get any form
@@ -648,6 +650,7 @@ def lecturer():
     if session.get('user_type') != 'lecturer':
         return redirect(url_for('login'))  # or another page
     return render_template('LecturerForm.html')
+
     if session['user_type'] == 'lecturer':
         return render_template('LecturerForm.html')
     
