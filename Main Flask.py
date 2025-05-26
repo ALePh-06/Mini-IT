@@ -37,7 +37,6 @@ def malaysia_time():
     return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
 
 
-
 class Users(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -118,13 +117,6 @@ class StudentCourse(db.Model):
     student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
 
-
-#Naufal
-#Time zone
-def malaysia_time():
-    return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
-
-# Database Models
 class Submission(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
