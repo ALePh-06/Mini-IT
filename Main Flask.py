@@ -8,14 +8,17 @@ import os
 import bcrypt
 import pytz
 from datetime import datetime
+from sqlalchemy import Enum, Column, Integer, String, DateTime, Boolean, ForeignKey, Text
+from sqlalchemy.orm import relationship, sessionmaker
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'mydatabase.db')
 
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your secret key'
+app.config['SECRET_KEY'] = '#83yUi_a'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 
 db = SQLAlchemy(app)
 
@@ -35,55 +38,64 @@ def malaysia_time():
 
 class Users(db.Model):
     __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String, unique=True, nullable=False)
-    password = db.Column(db.String, nullable=False)
-    user_type = db.Column(db.String, nullable=False)
+    id = Column(Integer, primary_key=True)
+    username = Column(String, unique=True, nullable=False)
+    password = Column(String, nullable=False)
+    user_type = Column(String, nullable=False)
 
 class Course(db.Model):
     __tablename__ = 'courses'
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String, nullable=False)
-    trimester = db.Column(db.Integer, nullable=False)
-    code = db.Column(db.String, nullable=False)
-    content = db.Column(db.String, nullable=False)
+    id = Column(Integer, primary_key=True)
+    title = Column(String, nullable=False)
+    trimester = Column(Integer, nullable=False)
+    code = Column(String, nullable=False)
+    content = Column(String, nullable=False)
 
 class Template(db.Model):
     __tablename__ = 'templates'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, nullable=False)
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
 
     fields = db.relationship('TemplateField', backref='template', cascade="all, delete-orphan")
 
 class TemplateField(db.Model):
     __tablename__ = 'template_fields'
-    id = db.Column(db.Integer, primary_key=True)
-    field_name = db.Column(db.String, nullable=False)
-    field_order = db.Column(db.Integer, nullable=False)
+    id = Column(Integer, primary_key=True)
+    field_name = Column(String, nullable=False)
+    field_order = Column(Integer, nullable=False)
 
-    template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
+    template_id = Column(Integer, db.ForeignKey('templates.id'), nullable=False)
 
 class Submission(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    group_name = db.Column(db.String(255), nullable=False) # Nullable means this column is required (can’t be empty), if true it meant optional
-    title = db.Column(db.Text, nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    filename = db.Column(db.String(255))
-    timestamp = db.Column(db.DateTime, default=malaysia_time)
+    __tablename__ = 'submissions'
+    id = Column(Integer, primary_key=True)
+    group_name = Column(String(255), nullable=False) # Nullable means this column is required (can’t be empty), if true it meant optional
+    title = Column(Text, nullable=False)
+    description = Column(Text, nullable=False)
+    filename = Column(String(255))
+    timestamp = Column(DateTime, default=malaysia_time)
     
 class SubmissionTemplate(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), nullable=False)    
+    __tablename__ = 'submission_templates'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)    
 
 #Setting for submission
 class SubmissionSettings(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    template_id = db.Column(db.Integer)
-    due_date = db.Column(db.DateTime, nullable=False)
-    allow_late = db.Column(db.Boolean, default=False)
-    auto_close = db.Column(db.Boolean, default=False)
-    late_penalty_info = db.Column(db.Text)  # e.g. "10% deduction per day"
+    __tablename__ = 'submissions_settings'
+    id = Column(Integer, primary_key=True)
+    template_id = Column(Integer)
+    due_date = Column(DateTime, nullable=False)
+    allow_late = Column(Boolean, default=False)
+    auto_close = Column(Boolean, default=False)
+    late_penalty_info = Column(Text)  # e.g. "10% deduction per day"
 
+class SubmissionStatus(db.Model):
+    __tablename__ = 'submission_status'
+    id = Column(Integer, ForeignKey('submissions.id'), nullable=False, primary_key=True)
+    team_id = Column(String, ForeignKey('submissions.team_id'), nullable=False)
+    lecturer_id = Column(Integer, ForeignKey('submissions.lecturer_id'), nullable=False)
+    status = Column(Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
 
 
 def get_course(course_id):
@@ -97,12 +109,14 @@ def get_template(template_id):
         abort(404)
     return template
 
+def get_submission(submission_id):
+    submission = db.session.get(Submission, submission_id)
+    if submission is None:
+        abort(404)
+    return submission
 
 with app.app_context():
     db.create_all()
-
-# Adding app secret key
-app.secret_key = "#83yUi_a"
 
 @app.before_request
 def require_login():
@@ -295,10 +309,6 @@ def delete(id):
     flash(f'Course "{course.title}" was successfully deleted!')
     return redirect(url_for('index'))
 
-#Naufal
-#Time zone
-
-# Routes
 @app.route('/StudentForm')
 def StudentForm():
     return render_template('StudentForm.html')
@@ -374,6 +384,10 @@ def download(filename):
 def lecturer():
     if session['user_type'] == 'lecturer':
         return render_template('LecturerForm.html')
+    
+@app.route('/Status')
+def Status():
+    submissions = session.query(Submission).filter(Submission.ID)
 
 
 
