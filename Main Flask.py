@@ -614,10 +614,6 @@ def lecturer():
     if session.get('user_type') != 'lecturer':
         return redirect(url_for('login'))  # or another page
     return render_template('LecturerForm.html')
-
-
-    if session['user_type'] == 'lecturer':
-        return render_template('LecturerForm.html')
     
 @app.route('/Status')
 def status():
@@ -629,7 +625,7 @@ def status():
         course_ids = [course.id for course in courses]
 
         # Get all submissions related to those courses (assuming submissions link to course/group with course_id)
-        submissions = Submission.query.Filter_by(course_ids).all()
+        submissions = Submission.query.filter_by(course_ids).all()
 
         return render_template("status.html", submissions=submissions)
 
