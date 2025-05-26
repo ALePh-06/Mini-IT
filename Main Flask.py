@@ -74,8 +74,6 @@ class TemplateField(db.Model):
 
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
 
-<<<<<<< HEAD
-=======
 class Submission(db.Model):
     __tablename__ = 'submissions'
     id = db.Column(db.Integer, primary_key=True)
@@ -111,7 +109,6 @@ class SubmissionStatus(db.Model):
     status = db.Column(db.Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
 
 
->>>>>>> c90f79f9f45d57c22648c10bd45a073f857dcde0
 def get_course(course_id):
     course = db.session.get(Course, course_id)
     if course is None:
@@ -123,15 +120,12 @@ def get_template(template_id):
         abort(404)
     return template
 
-<<<<<<< HEAD
-=======
 def get_submission(submission_id):
     submission = db.session.get(Submission, submission_id)
     if submission is None:
         abort(404)
     return submission
 
->>>>>>> c90f79f9f45d57c22648c10bd45a073f857dcde0
 with app.app_context():
     db.create_all()
 
@@ -331,8 +325,6 @@ def delete(id):
 #Time zone
 def malaysia_time():
     return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
-<<<<<<< HEAD
-
 
 # Database Models
 class Submission(db.Model):
@@ -386,9 +378,6 @@ with app.app_context():
     db.create_all()
 
 #Routes to student form
-=======
-# Routes
->>>>>>> c90f79f9f45d57c22648c10bd45a073f857dcde0
 @app.route('/StudentForm')
 def StudentForm():
     form = FormTemplate.query.first()  # Get any form
