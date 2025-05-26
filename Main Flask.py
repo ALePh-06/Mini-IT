@@ -298,6 +298,31 @@ class FormTemplate(db.Model):
     open_date = db.Column(db.DateTime)
     due_date = db.Column(db.DateTime)
 
+    # Relationship to link form fields to form templates
+    fields = db.relationship('FormField', backref='form_template', lazy=True)
+    '''This line sets up a one-to-many relationship:
+        FormTemplate → has many → FormFields.
+        It allows you to access all fields in a form using form.fields.
+        Also, backref allows you to go back like reverse from FormField to FormTemplate using form_field.form_template.'''
+        
+        
+#Relationship to link submissions to form templates
+class FormField(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    form_template_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=False)
+    label = db.Column(db.String(255))  #Exp: "What is your name?"
+    field_type = db.Column(db.String(50))  #Exp: "text", "number", "file", etc.
+
+
+#Answer model to link submissions with form fields
+#For asnwer of course
+class SubmissionFieldAnswer(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    submission_id = db.Column(db.Integer, db.ForeignKey('submission.id'), nullable=False)
+    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
+    value = db.Column(db.String)
+    
+
 #Create tables
 with app.app_context():
     db.create_all()
@@ -481,7 +506,8 @@ def review_submission(submission_id):
         abort(403)
 
     form_fields = FormTemplate.query.filter_by(form_id=submission.form_id).order_by(FormTemplate.id).all()
-    answers = submission.query.filter_by(submission_id=submission.id).order_by(submission.field_id).all()
+    answers = SubmissionFieldAnswer.query.filter_by(submission_id=submission.id).order_by(SubmissionFieldAnswer.field_id).all()
+
 
     #Pair up questions and answers
     qa_pairs = []
