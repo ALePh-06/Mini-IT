@@ -115,6 +115,11 @@ class SubmissionStatus(db.Model):
     lecturer_id = db.Column(db.Integer, db.ForeignKey('submissions.lecturer_id'), nullable=False)
     status = db.Column(db.Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
 
+class StudentCourse(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
+
 
 def get_course(course_id):
     course = db.session.get(Course, course_id)
