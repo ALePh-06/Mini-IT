@@ -77,18 +77,6 @@ class TemplateField(db.Model):
     field_order = db.Column(db.Integer, nullable=False)
 
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
-
-class Submission(db.Model):
-    __tablename__ = 'submissions'
-    id = db.Column(db.Integer, primary_key=True)
-    group_name = db.Column(db.String(255), nullable=False)
-    title = db.Column(db.Text, nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    filename = db.Column(db.String(255))
-    timestamp = db.Column(db.DateTime, default=malaysia_time)
-
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    user = db.relationship('Users', backref='submissions')
     
 class SubmissionTemplate(db.Model):
     __tablename__ = 'submission_templates'
@@ -104,13 +92,6 @@ class SubmissionSettings(db.Model):
     allow_late = db.Column(db.Boolean, default=False)
     auto_close = db.Column(db.Boolean, default=False)
     late_penalty_info = db.Column(db.Text)  # e.g. "10% deduction per day"
-
-class SubmissionStatus(db.Model):
-    __tablename__ = 'submission_status'
-    id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False, primary_key=True)
-    team_id = db.Column(db.String, db.ForeignKey('submissions.team_id'), nullable=False)
-    lecturer_id = db.Column(db.Integer, db.ForeignKey('submissions.lecturer_id'), nullable=False)
-    status = db.Column(db.Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
 
 class StudentCourse(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -128,6 +109,8 @@ class Submission(db.Model):
     is_late = db.Column(db.Boolean, default=False)
     due_date = db.Column(db.DateTime)
     form_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=True)
+    lecturer_id = db.Column(db.Integer, db.ForeignKey('submissions.lecturer_id'), nullable=False)
+    status = db.Column(db.Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
 
 #FormTemplate
 class FormTemplate(db.Model):
@@ -299,7 +282,7 @@ def index():
         return render_template('Index_s.html', courses=courses)
     
 
-@app.route('/<int:course_id>')
+@app.route('/course/<int:course_id>')
 def view_course(course_id):
     course = get_course(course_id)
     return render_template('view_course.html', course=course)
@@ -651,5 +634,23 @@ def status():
 
         return render_template("status_s.html", submissions=submissions)
 
+@app.route('/viewsubmission/<int:submission_id>')
+def view_submission(submission_id):
+    submission = get_submission(submission_id)
+    if session['user_type'] == 'lecturer':
+        return render_template('view_submission.html', submission=submission)
+    
+    else:
+        return render_template('view_submission_s.html', submission=submission)
+    
+@app.route("/update_status/<int:submission_id>", methods=["POST"])
+def update_status(submission_id):
+    new_status = request.form["status"]
+    submission = get_submission(submission_id)
+    submission.status = new_status
+    db.session.commit()
+
+    flash("Submission status updated.")
+    return redirect(url_for("view_submission", submission_id=submission.id))
 
 app.run(host="0.0.0.0", port=5000, debug=True)
