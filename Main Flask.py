@@ -94,11 +94,13 @@ class SubmissionSettings(db.Model):
     late_penalty_info = db.Column(db.Text)  # e.g. "10% deduction per day"
 
 class StudentCourse(db.Model):
+    __tablename__ = 'studentcourse'
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
 
 class Submission(db.Model):
+    __tablename__ = 'submissions'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     group_name = db.Column(db.String(255), nullable=False)
@@ -114,6 +116,7 @@ class Submission(db.Model):
 
 #FormTemplate
 class FormTemplate(db.Model):
+    __tablename__ = 'form_template'
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255))
     description = db.Column(db.Text)
@@ -131,6 +134,7 @@ class FormTemplate(db.Model):
         
 #Relationship to link submissions to form templates
 class FormField(db.Model):
+    __tablename__ = 'form_field'
     id = db.Column(db.Integer, primary_key=True)
     form_template_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=False)
     label = db.Column(db.String(255))  #Exp: "What is your name?"
@@ -140,8 +144,9 @@ class FormField(db.Model):
 #Answer model to link submissions with form fields
 #For asnwer of course
 class SubmissionFieldAnswer(db.Model):
+    __tablename__ = 'submissiondieldanswer'
     id = db.Column(db.Integer, primary_key=True)
-    submission_id = db.Column(db.Integer, db.ForeignKey('submission.id'), nullable=False)
+    submission_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False)
     field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
     value = db.Column(db.String)
 
