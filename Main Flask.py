@@ -113,6 +113,7 @@ class Submission(db.Model):
     form_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=True)
     lecturer_id = db.Column(db.Integer, db.ForeignKey('submissions.lecturer_id'), nullable=False)
     status = db.Column(db.Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
 
 #FormTemplate
 class FormTemplate(db.Model):
@@ -625,7 +626,7 @@ def status():
         course_ids = [course.id for course in courses]
 
         # Get all submissions related to those courses (assuming submissions link to course/group with course_id)
-        submissions = Submission.query.filter_by(course_ids).all()
+        submissions = Submission.query.filter(Submission.course_id.in_(course_ids)).all()
 
         return render_template("status.html", submissions=submissions)
 
