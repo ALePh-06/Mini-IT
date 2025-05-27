@@ -8,8 +8,8 @@
 
       <form method="POST" action="{{ url_for('update_status', submission_id=submission.id) }}">
         <input type="hidden" name="status" id="statusInput" value="{{ submission['status'] }}">
-        <button type="button" class="btn btn-info mb-2" id="statusButton">
-          {{ submission['status'] }}
+        <button type="button" class="btn btn-info mb-2" id="statusButton" style="min-width: 120px;">
+          {{ submission['status'] or "Pending" }}
         </button>
         <br>
         <button type="submit" class="btn btn-success">Save Status</button>
