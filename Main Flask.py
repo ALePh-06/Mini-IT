@@ -77,28 +77,8 @@ class TemplateField(db.Model):
     field_order = db.Column(db.Integer, nullable=False)
 
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
-    
-class SubmissionTemplate(db.Model):
-    __tablename__ = 'submission_templates'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), nullable=False)    
 
-#Setting for submission
-class SubmissionSettings(db.Model):
-    __tablename__ = 'submissions_settings'
-    id = db.Column(db.Integer, primary_key=True)
-    template_id = db.Column(db.Integer)
-    due_date = db.Column(db.DateTime, nullable=False)
-    allow_late = db.Column(db.Boolean, default=False)
-    auto_close = db.Column(db.Boolean, default=False)
-    late_penalty_info = db.Column(db.Text)  # e.g. "10% deduction per day"
-
-class StudentCourse(db.Model):
-    __tablename__ = 'studentcourse'
-    id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
-
+#Database model
 class Submission(db.Model):
     __tablename__ = 'submissions'
     id = db.Column(db.Integer, primary_key=True)
