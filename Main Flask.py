@@ -37,9 +37,6 @@ db = SQLAlchemy(app)
 def malaysia_time():
     return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
 
-
-
-
 class Users(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -81,18 +78,60 @@ class TemplateField(db.Model):
 
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
 
+# Database Models
 class Submission(db.Model):
     __tablename__ = 'submissions'
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     group_name = db.Column(db.String(255), nullable=False)
     title = db.Column(db.Text, nullable=False)
     description = db.Column(db.Text, nullable=False)
     filename = db.Column(db.String(255))
     timestamp = db.Column(db.DateTime, default=malaysia_time)
-
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    user = db.relationship('Users', backref='submissions')
+    is_late = db.Column(db.Boolean, default=False)
+    due_date = db.Column(db.DateTime)
+    form_id = db.Column(db.Integer, db.ForeignKey('form_templates.id'), nullable=True)
     
+    user = db.relationship('Users', backref='submissions')
+    form = db.relationship('FormTemplate', backref='submissions')
+
+#FormTemplate
+class FormTemplate(db.Model):
+    __tablename__ = 'form_templates'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255))
+    description = db.Column(db.Text)
+    filename = db.Column(db.String(255))
+    open_date = db.Column(db.DateTime)
+    due_date = db.Column(db.DateTime)
+
+    fields = db.relationship('FormField', backref='form', foreign_keys='FormField.form_template_id')
+    # Relationship to link form fields to form templates
+    fields = db.relationship('FormField', backref='form_templates', lazy=True)
+    '''This line sets up a one-to-many relationship:
+        FormTemplate > has many > FormFields.
+        It allows you to access all fields in a form using form.fields.
+        Also, backref allows you to go back like reverse from FormField to FormTemplate using form_field.form_template.'''
+        
+        
+#Relationship to link submissions to form templates
+class FormField(db.Model):
+    __tablename__ = 'form_field'
+    id = db.Column(db.Integer, primary_key=True)
+    form_template_id = db.Column(db.Integer, db.ForeignKey('form_templates.id'), nullable=False)
+    label = db.Column(db.String(255))  #Exp: "What is your name?"
+    field_type = db.Column(db.String(50))  #Exp: "text", "number", "file", etc.
+    
+#Answer model to link submissions with form fields
+#For asnwer of course
+class SubmissionFieldAnswer(db.Model):
+    __tablename__ = 'submissiondieldanswer'
+    id = db.Column(db.Integer, primary_key=True)
+    submission_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False)
+    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
+    value = db.Column(db.String)
+
+#Submission template model
 class SubmissionTemplate(db.Model):
     __tablename__ = 'submission_templates'
     id = db.Column(db.Integer, primary_key=True)
@@ -108,17 +147,27 @@ class SubmissionSettings(db.Model):
     auto_close = db.Column(db.Boolean, default=False)
     late_penalty_info = db.Column(db.Text)  # e.g. "10% deduction per day"
 
-class SubmissionStatus(db.Model):
-    __tablename__ = 'submission_status'
-    id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False, primary_key=True)
-    team_id = db.Column(db.String, db.ForeignKey('submissions.team_id'), nullable=False)
-    lecturer_id = db.Column(db.Integer, db.ForeignKey('submissions.lecturer_id'), nullable=False)
-    status = db.Column(db.Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
-
+#Student course model
 class StudentCourse(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+    
+#Comment model for lecturer's comments on submissions
+class Comment(db.Model):
+    __tablename__ = 'comments'
+    id = db.Column(db.Integer, primary_key=True)
+    submission_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # Lecturer's ID
+    text = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    submission = db.relationship('Submission', backref='comments')
+    user = db.relationship('Users', lazy='joined')  # To access lecturer info
+    #This means:"When I load a Comment, immediately also load its related User, using a SQL JOIN." 
+    #It makes things faster and avoids needing extra queries when you access comment.user.
+    #Without this relationship, we have to manually query the user using the user_id.
+    
 
 
 def get_course(course_id):
@@ -165,6 +214,7 @@ def login():
         if user and bcrypt.checkpw(password.encode("utf-8"), user.password.encode("utf-8")):
             session["username"] = username
             session["user_type"] = user.user_type
+            session["user_id"] = user.id
             
             # Redirect to a single index route
             flash(f"Login successful! Welcome, {user.user_type}!")
@@ -373,66 +423,12 @@ def delete(id):
     return redirect(url_for('index'))
 
 #Naufal
-#Time zone
-def malaysia_time():
-    return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
-
-# Database Models
-class Submission(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    group_name = db.Column(db.String(255), nullable=False)
-    title = db.Column(db.Text, nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    filename = db.Column(db.String(255))
-    timestamp = db.Column(db.DateTime, default=malaysia_time)
-    is_late = db.Column(db.Boolean, default=False)
-    due_date = db.Column(db.DateTime)
-    form_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=True)
-
-#FormTemplate
-class FormTemplate(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(255))
-    description = db.Column(db.Text)
-    filename = db.Column(db.String(255))
-    open_date = db.Column(db.DateTime)
-    due_date = db.Column(db.DateTime)
-
-    # Relationship to link form fields to form templates
-    fields = db.relationship('FormField', backref='form_template', lazy=True)
-    '''This line sets up a one-to-many relationship:
-        FormTemplate → has many → FormFields.
-        It allows you to access all fields in a form using form.fields.
-        Also, backref allows you to go back like reverse from FormField to FormTemplate using form_field.form_template.'''
-        
-        
-#Relationship to link submissions to form templates
-class FormField(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    form_template_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=False)
-    label = db.Column(db.String(255))  #Exp: "What is your name?"
-    field_type = db.Column(db.String(50))  #Exp: "text", "number", "file", etc.
-
-
-#Answer model to link submissions with form fields
-#For asnwer of course
-class SubmissionFieldAnswer(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    submission_id = db.Column(db.Integer, db.ForeignKey('submission.id'), nullable=False)
-    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
-    value = db.Column(db.String)
-    
-
-#Create tables
-with app.app_context():
-    db.create_all()
 
 #Routes to student form
 @app.route('/StudentForm')
 def StudentForm():
     form = FormTemplate.query.first()  # Get any form
-    return render_template('SubmissionHistory.html', form=form)
+    return render_template('StudentForm.html', form=form)
 
 #Route to display available forms for students
 @app.route('/Student/AvailableForms')
@@ -520,8 +516,10 @@ def submit():
     form_id = request.form.get('form_id')  
     due_date = None
     form = None
+    is_late = False  
 
     # Convert form_id to integer safely and retrieve the form
+    now = malaysia_time()  # Timezone-aware
     if form_id:
         try:
             form_id_int = int(form_id)
@@ -532,15 +530,12 @@ def submit():
             flash("Invalid form ID.", "danger")
             return redirect(url_for('StudentForm'))
         
-        # Check if submission is late
-        now = malaysia_time()  # Timezone-aware
-        is_late = False
-
         # Make due_date timezone-aware if it's not already
         if due_date and due_date.tzinfo is None:
             malaysia = timezone('Asia/Kuala_Lumpur')
             due_date = malaysia.localize(due_date)
 
+        # Check if the submission is late
         if due_date and now > due_date:
             is_late = True
 
@@ -561,6 +556,7 @@ def submit():
 
     flash("Submission successful!", "success")
     return redirect(url_for('StudentForm'))
+
 
 #Route to display submission history
 @app.route('/SubmissionHistory')
@@ -620,7 +616,7 @@ def review_submission(submission_id):
     if session.get('user_type') != 'lecturer':
         abort(403)
 
-    form_fields = FormTemplate.query.filter_by(form_id=submission.form_id).order_by(FormTemplate.id).all()
+    form_fields = FormField.query.filter_by(form_template_id=submission.form_id).order_by(FormField.id).all()
     answers = SubmissionFieldAnswer.query.filter_by(submission_id=submission.id).order_by(SubmissionFieldAnswer.field_id).all()
 
 
@@ -633,7 +629,41 @@ def review_submission(submission_id):
             'answer': answer.value if answer else 'N/A'
         })
 
-    return render_template('ReviewSubmission.html', submission=submission, qa_pairs=qa_pairs)
+    comments = Comment.query.filter_by(submission_id=submission_id).order_by(Comment.timestamp.desc()).all()
+     
+    return render_template('ReviewSubmission.html', submission=submission, qa_pairs=qa_pairs, comments=comments)
+
+#Route to handle comment submission
+@app.route('/submit_comment/<int:submission_id>', methods=['POST'])
+def submit_comment(submission_id):
+    print("Submit comment user_type:", session.get('user_type'))
+    print("Submit comment user_id:", session.get('user_id'))
+    
+    #Only allow lecturers to submit comments
+    if session.get('user_type') != 'lecturer':
+        abort(403)
+    
+    #Ensure user is logged in and user_id is in session
+    if 'user_id' not in session:
+        abort(403)  # or redirect to login page
+    
+    comment_text = request.form.get('comment')
+    if not comment_text:
+        flash("Comment cannot be empty.")
+        return redirect(url_for('review_submission', submission_id=submission_id))
+    
+    #Create and save the comment
+    new_comment = Comment(
+        submission_id=submission_id,
+        user_id=session['user_id'],
+        text=comment_text,
+        timestamp=datetime.utcnow()
+    )
+    db.session.add(new_comment)
+    db.session.commit()
+
+    flash("Comment submitted successfully!")
+    return redirect(url_for('review_submission', submission_id=submission_id))
 
 #Route for student history
 @app.route('/StudentHistory')
@@ -663,6 +693,7 @@ def LecturerForm():
     
     return render_template('LecturerForm.html')
     
+#Route for submission status
 @app.route('/Status')
 def status():
     current_user = Users.query.filter_by(username=session["username"]).first()
@@ -685,6 +716,7 @@ def status():
 
         return render_template("status_s.html", submissions=submissions)
 
+#Route to view a specific submission
 @app.route('/viewsubmission/<int:submission_id>')
 def view_submission(submission_id):
     submission = get_submission(submission_id)
@@ -693,11 +725,19 @@ def view_submission(submission_id):
     
     else:
         return render_template('view_submission_s.html', submission=submission)
-    
+
+#Route to update submission status  
 @app.route("/update_status/<int:submission_id>", methods=["POST"])
 def update_status(submission_id):
     new_status = request.form["status"]
-    submission = get_submission(submission_id)
+    
+    # Get the actual SQLAlchemy model instance
+    submission = Submission.query.get_or_404(submission_id)
+
+    # Only allow lecturers to update
+    if session.get("user_type") != "lecturer":
+        abort(403)
+
     submission.status = new_status
     db.session.commit()
 
