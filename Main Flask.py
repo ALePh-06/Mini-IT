@@ -754,7 +754,7 @@ def view_submission(submission_id):
         return render_template('view_comment.html', submission=submission, comments=comments)
 
 
-# New combined route for updating both status and adding comment
+#New combined route for updating both status and adding comment
 @app.route("/update_status/<int:submission_id>", methods=["POST"])
 def update_status_and_comment(submission_id):
     submission = Submission.query.get_or_404(submission_id)
