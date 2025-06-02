@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <div class="card">
+    <div class="card-body">
+      <h3 class="card-title">{{ submission['title'] }}</h3>
+      <p class="card-text">{{ submission['description'] }}</p>
+
+      <form method="POST" action="{{ url_for('update_status', submission_id=submission.id) }}">
+        <input type="hidden" name="status" id="statusInput" value="{{ submission['status'] }}">
+        <button type="button" class="btn btn-info mb-2" id="statusButton">
+          {{ submission['status'] }}
+        </button>
+        <br>
+        <button type="submit" class="btn btn-success">Save Status</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      const button = document.getElementById("statusButton");
+      const input = document.getElementById("statusInput");
+
+      const statuses = ["Pending", "Approved", "Need changes"];
+
+      button.addEventListener("click", function() {
+        const current = input.value;
+        const nextIndex = (statuses.indexOf(current) + 1) % statuses.length;
+        const nextStatus = statuses[nextIndex];
+
+        input.value = nextStatus;
+        button.textContent = nextStatus;
+      });
+    });
+  </script>
+{% endblock %}

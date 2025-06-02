@@ -1,0 +1,11 @@
+{% extends 'base_s.html' %}
+
+{% block content %}
+  <div class="card">
+    <div class="card-body">
+      <h3 class="card-title">{{ submission['title'] }}</h3>
+      <span class="badge badge-primary">Status : {{ submission['status'] }}</span>
+      <p class="card-text">{{ submission['description'] }}</p>
+        </div>
+  </div>
+{% endblock %}

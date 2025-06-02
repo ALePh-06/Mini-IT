@@ -37,7 +37,6 @@ def malaysia_time():
     return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
 
 
-
 class Users(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -78,18 +77,6 @@ class TemplateField(db.Model):
     field_order = db.Column(db.Integer, nullable=False)
 
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
-
-class Submission(db.Model):
-    __tablename__ = 'submissions'
-    id = db.Column(db.Integer, primary_key=True)
-    group_name = db.Column(db.String(255), nullable=False)
-    title = db.Column(db.Text, nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    filename = db.Column(db.String(255))
-    timestamp = db.Column(db.DateTime, default=malaysia_time)
-
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    user = db.relationship('Users', backref='submissions')
     
 class SubmissionTemplate(db.Model):
     __tablename__ = 'submission_templates'
@@ -106,17 +93,63 @@ class SubmissionSettings(db.Model):
     auto_close = db.Column(db.Boolean, default=False)
     late_penalty_info = db.Column(db.Text)  # e.g. "10% deduction per day"
 
-class SubmissionStatus(db.Model):
-    __tablename__ = 'submission_status'
-    id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False, primary_key=True)
-    team_id = db.Column(db.String, db.ForeignKey('submissions.team_id'), nullable=False)
-    lecturer_id = db.Column(db.Integer, db.ForeignKey('submissions.lecturer_id'), nullable=False)
-    status = db.Column(db.Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
-
 class StudentCourse(db.Model):
+    __tablename__ = 'studentcourse'
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+
+class Submission(db.Model):
+    __tablename__ = 'submissions'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    group_name = db.Column(db.String(255), nullable=False)
+    title = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    filename = db.Column(db.String(255))
+    timestamp = db.Column(db.DateTime, default=malaysia_time)
+    is_late = db.Column(db.Boolean, default=False)
+    due_date = db.Column(db.DateTime)
+    form_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=True)
+    lecturer_id = db.Column(db.Integer, db.ForeignKey('submissions.lecturer_id'), nullable=False)
+    status = db.Column(db.Enum("pending", "approved", "rejected", name="status_enum"), default="pending")
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+
+#FormTemplate
+class FormTemplate(db.Model):
+    __tablename__ = 'form_template'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255))
+    description = db.Column(db.Text)
+    filename = db.Column(db.String(255))
+    open_date = db.Column(db.DateTime)
+    due_date = db.Column(db.DateTime)
+
+    # Relationship to link form fields to form templates
+    fields = db.relationship('FormField', backref='form_template', lazy=True)
+    '''This line sets up a one-to-many relationship:
+        FormTemplate → has many → FormFields.
+        It allows you to access all fields in a form using form.fields.
+        Also, backref allows you to go back like reverse from FormField to FormTemplate using form_field.form_template.'''
+        
+        
+#Relationship to link submissions to form templates
+class FormField(db.Model):
+    __tablename__ = 'form_field'
+    id = db.Column(db.Integer, primary_key=True)
+    form_template_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=False)
+    label = db.Column(db.String(255))  #Exp: "What is your name?"
+    field_type = db.Column(db.String(50))  #Exp: "text", "number", "file", etc.
+
+
+#Answer model to link submissions with form fields
+#For asnwer of course
+class SubmissionFieldAnswer(db.Model):
+    __tablename__ = 'submissiondieldanswer'
+    id = db.Column(db.Integer, primary_key=True)
+    submission_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False)
+    field_id = db.Column(db.Integer, db.ForeignKey('form_fields.id'), nullable=False)  
+    value = db.Column(db.String)
 
 class Group(db.Model):
     __tablename__ = 'groups'
@@ -140,6 +173,7 @@ def get_course(course_id):
     if course is None:
         abort(404)
     return course
+
 def get_template(template_id):
     template = db.session.get(Template, template_id)
     if template is None:
@@ -156,11 +190,6 @@ def get_submission(submission_id):
 
 with app.app_context():
     db.create_all()
-
-# Muiz's codes
-
-# Adding app secret key
-app.secret_key = "#83yUi_a"
 
 @app.before_request
 def require_login():
@@ -243,8 +272,8 @@ def JoinCourse():
         return redirect(url_for('login'))
 
     if request.method == 'POST':
-        course_code = request.form['code'].strip()
-        student_id = session['user_type']
+        course_code = request.form['course_code'].strip()
+        student_id = Users.query.filter_by(username=session['username']).first().id
         course = Course.query.filter_by(code=course_code).first()
 
         if not course:
@@ -279,7 +308,7 @@ def index():
         return render_template('Index_s.html', courses=courses)
     
 
-@app.route('/<int:course_id>')
+@app.route('/course/<int:course_id>')
 def view_course(course_id):
     course = get_course(course_id)
     return render_template('view_course.html', course=course)
@@ -387,12 +416,7 @@ def delete(id):
     flash(f'Course "{course.title}" was successfully deleted!')
     return redirect(url_for('index'))
 
-#Naufal
-#Time zone
-def malaysia_time():
-    return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
-# Routes
-
+#Routes to student form
 @app.route('/StudentForm')
 def StudentForm():
     form = FormTemplate.query.first()  # Get any form
@@ -610,10 +634,6 @@ def lecturer():
     if session.get('user_type') != 'lecturer':
         return redirect(url_for('login'))  # or another page
     return render_template('LecturerForm.html')
-
-
-    if session['user_type'] == 'lecturer':
-        return render_template('LecturerForm.html')
     
 @app.route('/Status')
 def status():
@@ -625,7 +645,7 @@ def status():
         course_ids = [course.id for course in courses]
 
         # Get all submissions related to those courses (assuming submissions link to course/group with course_id)
-        submissions = Submission.query.Filter_by(course_ids).all()
+        submissions = Submission.query.filter(Submission.course_id.in_(course_ids)).all()
 
         return render_template("status.html", submissions=submissions)
 
@@ -637,5 +657,23 @@ def status():
 
         return render_template("status_s.html", submissions=submissions)
 
+@app.route('/viewsubmission/<int:submission_id>')
+def view_submission(submission_id):
+    submission = get_submission(submission_id)
+    if session['user_type'] == 'lecturer':
+        return render_template('view_submission.html', submission=submission)
+    
+    else:
+        return render_template('view_submission_s.html', submission=submission)
+    
+@app.route("/update_status/<int:submission_id>", methods=["POST"])
+def update_status(submission_id):
+    new_status = request.form["status"]
+    submission = get_submission(submission_id)
+    submission.status = new_status
+    db.session.commit()
+
+    flash("Submission status updated.")
+    return redirect(url_for("view_submission", submission_id=submission.id))
 
 app.run(host="0.0.0.0", port=5000, debug=True)
