@@ -154,7 +154,7 @@ class StudentCourse(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
-    
+  
 #Comment model for lecturer's comments on submissions
 class Comment(db.Model):
     __tablename__ = 'comments'
@@ -169,8 +169,23 @@ class Comment(db.Model):
     #This means:"When I load a Comment, immediately also load its related User, using a SQL JOIN." 
     #It makes things faster and avoids needing extra queries when you access comment.user.
     #Without this relationship, we have to manually query the user using the user_id.
-    
 
+class Group(db.Model):
+    __tablename__ = 'groups'
+    id = db.Column(db.Integer, primary_key=True)
+    group_code = db.Column(db.String, nullable=False, unique=True)
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+
+    members = db.relationship('GroupMembers', backref='group', cascade="all, delete-orphan")
+
+class GroupMembers(db.Model):
+    __tablename__ = 'group_members'
+    id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    student = db.relationship('Users', backref='group_memberships')
+
+# Functions start here
 
 def get_course(course_id):
     course = db.session.get(Course, course_id)
@@ -189,6 +204,7 @@ def get_submission(submission_id):
     if submission is None:
         abort(404)
     return submission
+
 
 with app.app_context():
     db.create_all()
@@ -424,9 +440,12 @@ def delete(id):
     flash(f'Course "{course.title}" was successfully deleted!')
     return redirect(url_for('index'))
 
-#Naufal
+#Time zone
+def malaysia_time():
+    return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
+  
+# Routes
 
-#Routes to student form
 @app.route('/StudentForm')
 def StudentForm():
     form = FormTemplate.query.first()  # Get any form
