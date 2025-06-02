@@ -91,6 +91,8 @@ class Submission(db.Model):
     is_late = db.Column(db.Boolean, default=False)
     due_date = db.Column(db.DateTime)
     form_id = db.Column(db.Integer, db.ForeignKey('form_templates.id'), nullable=True)
+    status = db.Column(db.String(50), default='Pending')
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'))
     
     user = db.relationship('Users', backref='submissions')
     form = db.relationship('FormTemplate', backref='submissions')
@@ -608,7 +610,7 @@ def history():
 
 
 #Route to review a submission
-@app.route('/review/<int:submission_id>')
+'''@app.route('/review/<int:submission_id>')
 def review_submission(submission_id):
     submission = Submission.query.get_or_404(submission_id)
 
@@ -631,7 +633,8 @@ def review_submission(submission_id):
 
     comments = Comment.query.filter_by(submission_id=submission_id).order_by(Comment.timestamp.desc()).all()
      
-    return render_template('ReviewSubmission.html', submission=submission, qa_pairs=qa_pairs, comments=comments)
+    return render_template('ReviewSubmission.html', submission=submission, qa_pairs=qa_pairs, comments=comments)'''
+    #Dont need this anymore
 
 #Route to handle comment submission
 @app.route('/submit_comment/<int:submission_id>', methods=['POST'])
@@ -722,29 +725,42 @@ def status():
 #Route to view a specific submission
 @app.route('/viewsubmission/<int:submission_id>')
 def view_submission(submission_id):
-    submission = get_submission(submission_id)
-    if session['user_type'] == 'lecturer':
-        return render_template('view_submission.html', submission=submission)
+    submission = Submission.query.get_or_404(submission_id)
     
-    else:
-        return render_template('view_submission_s.html', submission=submission)
+    comments = Comment.query.filter_by(submission_id=submission.id).order_by(Comment.timestamp.desc()).all()
 
-#Route to update submission status  
+    if session['user_type'] == 'lecturer':
+        return render_template('view_submission.html', submission=submission, comments=comments)
+    else:
+        return render_template('view_comment.html', submission=submission, comments=comments)
+
+
+# New combined route for updating both status and adding comment
 @app.route("/update_status/<int:submission_id>", methods=["POST"])
-def update_status(submission_id):
-    new_status = request.form["status"]
-    
-    # Get the actual SQLAlchemy model instance
+def update_status_and_comment(submission_id):
     submission = Submission.query.get_or_404(submission_id)
 
-    # Only allow lecturers to update
     if session.get("user_type") != "lecturer":
         abort(403)
 
-    submission.status = new_status
+    new_status = request.form.get("status")
+    comment_text = request.form.get("comment")
+
+    if new_status:
+        submission.status = new_status
+
+    if comment_text:
+        current_user = Users.query.filter_by(username=session["username"]).first()
+        comment = Comment(
+            submission_id=submission.id,
+            user_id=current_user.id,
+            text=comment_text
+        )
+        db.session.add(comment)
+
     db.session.commit()
 
-    flash("Submission status updated.")
+    flash("Submission status and comment updated.")
     return redirect(url_for("view_submission", submission_id=submission.id))
 
 app.run(host="0.0.0.0", port=5000, debug=True)

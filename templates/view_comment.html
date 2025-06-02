@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>View Submission</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .container { max-width: 800px; margin: auto; }
+        h1, h2 { color: #333; }
+        .comment { margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
+        .status { font-weight: bold; color: #007BFF; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Submission Details</h1>
+        <p><strong>Title:</strong> {{ submission.title }}</p>
+        <p><strong>Submitted At:</strong> {{ submission.timestamp }}</p>
+        <p class="status"><strong>Status:</strong> {{ submission.status }}</p>
+
+        <hr>
+        <h2>Lecturer Comments</h2>
+        {% if comments %}
+            {% for comment in comments %}
+                <div class="comment">
+                    <strong>{{ comment.user.username }}</strong> ({{ comment.timestamp.strftime('%Y-%m-%d %H:%M') }}):<br>
+                    {{ comment.text }}
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No comments from lecturer yet.</p>
+        {% endif %}
+    </div>
+</body>
+</html>
