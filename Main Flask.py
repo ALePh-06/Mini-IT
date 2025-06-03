@@ -196,6 +196,7 @@ def get_template(template_id):
         abort(404)
     return template
 
+
 def get_submission(submission_id):
     submission = db.session.get(Submission, submission_id)
     if submission is None:
@@ -293,8 +294,8 @@ def JoinCourse():
         return redirect(url_for('login'))
 
     if request.method == 'POST':
-        course_code = request.form['code'].strip()
-        student_id = session['user_type']
+        course_code = request.form['course_code'].strip()
+        student_id = Users.query.filter_by(username=session['username']).first().id
         course = Course.query.filter_by(code=course_code).first()
 
         if not course:
