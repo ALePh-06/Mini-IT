@@ -145,9 +145,6 @@ class SubmissionSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     template_id = db.Column(db.Integer)
     due_date = db.Column(db.DateTime, nullable=False)
-    allow_late = db.Column(db.Boolean, default=False)
-    auto_close = db.Column(db.Boolean, default=False)
-    late_penalty_info = db.Column(db.Text)  # e.g. "10% deduction per day"
 
 #Student course model
 class StudentCourse(db.Model):
@@ -629,33 +626,6 @@ def history():
                            selected_group=selected_group)
 
 
-#Route to review a submission
-'''@app.route('/review/<int:submission_id>')
-def review_submission(submission_id):
-    submission = Submission.query.get_or_404(submission_id)
-
-    #Optionally: restrict access to lecturers only
-    if session.get('user_type') != 'lecturer':
-        abort(403)
-
-    form_fields = FormField.query.filter_by(form_template_id=submission.form_id).order_by(FormField.id).all()
-    answers = SubmissionFieldAnswer.query.filter_by(submission_id=submission.id).order_by(SubmissionFieldAnswer.field_id).all()
-
-
-    #Pair up questions and answers
-    qa_pairs = []
-    for field in form_fields:
-        answer = next((a for a in answers if a.field_id == field.id), None)
-        qa_pairs.append({
-            'question': field.label,
-            'answer': answer.value if answer else 'N/A'
-        })
-
-    comments = Comment.query.filter_by(submission_id=submission_id).order_by(Comment.timestamp.desc()).all()
-     
-    return render_template('ReviewSubmission.html', submission=submission, qa_pairs=qa_pairs, comments=comments)'''
-    #Dont need this anymore
-
 #Route to handle comment submission
 @app.route('/submit_comment/<int:submission_id>', methods=['POST'])
 def submit_comment(submission_id):
@@ -755,7 +725,7 @@ def view_submission(submission_id):
         return render_template('view_comment.html', submission=submission, comments=comments)
 
 
-# New combined route for updating both status and adding comment
+#New combined route for updating both status and adding comment
 @app.route("/update_status/<int:submission_id>", methods=["POST"])
 def update_status_and_comment(submission_id):
     submission = Submission.query.get_or_404(submission_id)
