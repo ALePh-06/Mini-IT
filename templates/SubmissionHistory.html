@@ -28,6 +28,12 @@
             {% if s.filename %}
                 <a href="{{ url_for('download', filename=s.filename) }}" download>Download File</a> 
             {% endif %}
+
+            {% if s.edited %}
+                <p><strong>Edited</strong></p>
+            {% else %}
+                <p><strong>Original</strong></p>
+            {% endif %}
         </li>
         <hr>
     {% endfor %}

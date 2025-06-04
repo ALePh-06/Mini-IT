@@ -4,7 +4,16 @@
   <div class="card">
     <div class="card-body">
       <h3 class="card-title">{{ submission.title }}</h3>
-      <p><strong>Submitted At:</strong> {{ submission.timestamp }}</p>
+      <p><strong>Group:</strong> {{ submission.group_name }}</p>
+      <p><strong>Description:</strong> {{ submission.description }}</p>
+      <p><strong>Submitted At:</strong> {{ submission.timestamp.strftime('%Y-%m-%d %H:%M') }}</p>
+
+
+      {% if submission.filename %}
+        <a href="{{ url_for('static', filename='uploads/' ~ submission.filename) }}" class="btn btn-outline-primary mb-2" download>
+          Download File
+        </a>
+      {% endif %}
 
       <form method="POST" action="{{ url_for('update_status_and_comment', submission_id=submission.id) }}">
         <!-- Hidden input to store status -->

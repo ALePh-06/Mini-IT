@@ -93,6 +93,7 @@ class Submission(db.Model):
     form_id = db.Column(db.Integer, db.ForeignKey('form_templates.id'), nullable=True)
     status = db.Column(db.String(50), default='Pending')
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'))
+    edited = db.Column(db.Boolean, default=False)  
     
     user = db.relationship('Users', backref='submissions')
     form = db.relationship('FormTemplate', backref='submissions')
@@ -104,10 +105,8 @@ class FormTemplate(db.Model):
     title = db.Column(db.String(255))
     description = db.Column(db.Text)
     filename = db.Column(db.String(255))
-    open_date = db.Column(db.DateTime)
     due_date = db.Column(db.DateTime)
 
-    fields = db.relationship('FormField', backref='form', foreign_keys='FormField.form_template_id')
     # Relationship to link form fields to form templates
     fields = db.relationship('FormField', backref='form_templates', lazy=True)
     '''This line sets up a one-to-many relationship:
@@ -127,7 +126,7 @@ class FormField(db.Model):
 #Answer model to link submissions with form fields
 #For asnwer of course
 class SubmissionFieldAnswer(db.Model):
-    __tablename__ = 'submissiondieldanswer'
+    __tablename__ = 'submission_field_answer'
     id = db.Column(db.Integer, primary_key=True)
     submission_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False)
     field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
@@ -441,15 +440,18 @@ def delete(id):
 #Time zone
 def malaysia_time():
     return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
-  
-# Routes
 
+
+# Naufal Codes 
+
+# ALL CODE RELATED TO STUDENT!!!!!!!!!!!!!!!!!!!!
+# Route to display student form
 @app.route('/StudentForm')
 def StudentForm():
     form = FormTemplate.query.first()  # Get any form
     return render_template('StudentForm.html', form=form)
 
-#Route to display available forms for students
+# Route to display available forms for students
 @app.route('/Student/AvailableForms')
 def student_forms():
     now = malaysia_time()
@@ -463,202 +465,7 @@ def student_forms():
 
     return render_template('FormExist.html', forms=forms, malaysia_time=malaysia_time)
 
-#Route to display lecturer form creation page
-@app.route('/create_form', methods=['POST'])
-def create_form():
-    title = request.form['Title']
-    description = request.form['Description']
-    file = request.files.get('Upload_file')
-    open_date_str = request.form.get('open_date')
-    due_date_str = request.form.get('due_date')
-    
-    due_date = None
-    open_date = None
-    
-    try:
-        if open_date_str:
-            open_date = datetime.strptime(open_date_str, "%Y-%m-%dT%H:%M")
-        if due_date_str:
-            due_date = datetime.strptime(due_date_str, "%Y-%m-%dT%H:%M")
-    except ValueError:
-        flash("Invalid date format.", "error")
-        return redirect(url_for('lecturer'))
-    
-    filename = None
-    if file:
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-
- #Define Malaysia timezone and localize the datetime
-    malaysia_tz = pytz.timezone('Asia/Kuala_Lumpur')
-    if open_date:
-        open_date = malaysia_tz.localize(open_date)
-    if due_date:
-        due_date = malaysia_tz.localize(due_date)
-        
-    new_form = FormTemplate(
-        title=title,
-        description=description,
-        filename=filename,
-        open_date=open_date,
-        due_date=due_date
-    )
-    db.session.add(new_form)
-    db.session.commit()
-
-    flash("Form created successfully!", "success")
-    return render_template('LecturerForm.html')
-
-#Route to handle student form submission
-@app.route('/submit', methods=['POST'])
-def submit():
-    if 'username' not in session:  # Check if user is logged in
-        flash("You must be logged in to submit.") 
-        return redirect(url_for('login'))
-
-    user = Users.query.filter_by(username=session['username']).first()  # Check if user exists
-    if not user:
-        flash("User not found.")
-        return redirect(url_for('login'))
-
-    # Get form data
-    group_name = request.form['Group_Name']
-    title = request.form['Title']
-    description = request.form['Description']
-    file = request.files.get('Upload_file')
-
-    filename = None
-    if file:
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-
-    form_id = request.form.get('form_id')  
-    due_date = None
-    form = None
-    is_late = False  
-
-    # Convert form_id to integer safely and retrieve the form
-    now = malaysia_time()  # Timezone-aware
-    if form_id:
-        try:
-            form_id_int = int(form_id)
-            form = FormTemplate.query.get(form_id_int)
-            if form and form.due_date:
-                due_date = form.due_date
-        except ValueError:
-            flash("Invalid form ID.", "danger")
-            return redirect(url_for('StudentForm'))
-        
-        # Make due_date timezone-aware if it's not already
-        if due_date and due_date.tzinfo is None:
-            malaysia = timezone('Asia/Kuala_Lumpur')
-            due_date = malaysia.localize(due_date)
-
-        # Check if the submission is late
-        if due_date and now > due_date:
-            is_late = True
-
-    # Create and save submission
-    new_submission = Submission(
-        user_id=user.id,
-        group_name=group_name,
-        title=title,
-        description=description,
-        filename=filename,
-        timestamp=now,
-        is_late=is_late,
-        due_date=due_date
-    )
-
-    db.session.add(new_submission)
-    db.session.commit()
-
-    flash("Submission successful!", "success")
-    return redirect(url_for('StudentForm'))
-
-
-#Route to display submission history
-@app.route('/SubmissionHistory')
-def history():
-    user_type = session.get('user_type')
-    username = session.get('username')
-    
-    if not username:
-        flash("Please log in.")
-        return redirect(url_for('login'))
-    
-    user = Users.query.filter_by(username=username).first()
-    if not user:
-        flash("User not found.")
-        return redirect(url_for('login'))
-
-    #Get list of distinct group names for filter dropdown (if any)
-    group_names = [g[0] for g in db.session.query(Submission.group_name).distinct().all()]
-    
-    if user_type == 'lecturer':
-        selected_group = request.args.get('group_name')
-
-        #Get all user_ids for students
-        student_ids = [u.id for u in Users.query.filter_by(user_type='student').all()]
-
-        if selected_group:
-            submissions = Submission.query.filter(
-                Submission.group_name == selected_group,
-                Submission.user_id.in_(student_ids)
-            ).order_by(Submission.timestamp.desc()).all()
-        else:
-            submissions = Submission.query.filter(
-                Submission.user_id.in_(student_ids)
-            ).order_by(Submission.timestamp.desc()).all()
-    
-    elif user_type == 'student':
-        #Student sees only their own submissions
-        submissions = Submission.query.filter_by(user_id=user.id).order_by(Submission.timestamp.desc()).all()
-        selected_group = None
-    
-    else:
-        submissions = []
-        selected_group = None
-
-    return render_template('SubmissionHistory.html',
-                           submissions=submissions,
-                           group_names=group_names,
-                           selected_group=selected_group)
-
-
-#Route to handle comment submission
-@app.route('/submit_comment/<int:submission_id>', methods=['POST'])
-def submit_comment(submission_id):
-    print("Submit comment user_type:", session.get('user_type'))
-    print("Submit comment user_id:", session.get('user_id'))
-    
-    #Only allow lecturers to submit comments
-    if session.get('user_type') != 'lecturer':
-        abort(403)
-    
-    #Ensure user is logged in and user_id is in session
-    if 'user_id' not in session:
-        abort(403)  # or redirect to login page
-    
-    comment_text = request.form.get('comment')
-    if not comment_text:
-        flash("Comment cannot be empty.")
-        return redirect(url_for('review_submission', submission_id=submission_id))
-    
-    #Create and save the comment
-    new_comment = Comment(
-        submission_id=submission_id,
-        user_id=session['user_id'],
-        text=comment_text,
-        timestamp=datetime.utcnow()
-    )
-    db.session.add(new_comment)
-    db.session.commit()
-
-    flash("Comment submitted successfully!")
-    return redirect(url_for('review_submission', submission_id=submission_id))
-
-#Route for student history
+# Route for student history
 @app.route('/StudentHistory')
 def student_history():
     if 'username' not in session:
@@ -672,47 +479,111 @@ def student_history():
     submissions = Submission.query.filter_by(user_id=user.id).order_by(Submission.timestamp.desc()).all()
     return render_template("StudentHistory.html", submissions=submissions)
 
-#Route to download a file
-@app.route('/download/<filename>')
-def download(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
+# Route to edit a submission
+@app.route('/edit_submission/<int:submission_id>', methods=['GET'])
+def edit_submission(submission_id):
+    submission = Submission.query.get_or_404(submission_id)
+    
+    # Can add access control here: only allow the student who submitted it
+    if submission.user_id != session.get('user_id'):
+        abort(403)
+    form = FormTemplate.query.first()  # Get the first form template, or modify to get a specific one if needed
+    return render_template('edit_submission.html', submission=submission, form=form)
 
-#Route for lecturer form
-@app.route('/LecturerForm')
-def LecturerForm():
+
+# ALL CODE RELATED TO LECTURER!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# Route to display lecturer form creation page
+@app.route('/create_form', methods=['GET', 'POST'])
+def create_form():
+    # Restrict access to lecturers only
     if 'user_type' not in session or session['user_type'] != 'lecturer':
         flash("Access denied: You must be a lecturer to view this page.", "danger")
-        return redirect(url_for('login'))  # Or a different page, like 'index'
+        return redirect(url_for('index'))  
     
+    if request.method == 'POST':
+        title = request.form['Title']
+        description = request.form['Description']
+        file = request.files.get('Upload_file')
+        due_date_str = request.form.get('due_date')
+
+        due_date = None
+
+        try:
+            if due_date_str:
+                due_date = datetime.strptime(due_date_str, "%Y-%m-%dT%H:%M")
+        except ValueError:
+            flash("Invalid date format.", "error")
+            return render_template('LecturerForm.html')
+
+        filename = None
+        if file and file.filename:
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+        # Localize due_date to Malaysia time
+        malaysia_tz = pytz.timezone('Asia/Kuala_Lumpur')
+        if due_date:
+            due_date = malaysia_tz.localize(due_date)
+
+        new_form = FormTemplate(
+            title=title,
+            description=description,
+            filename=filename,
+            due_date=due_date
+        )
+        db.session.add(new_form)
+        db.session.commit()
+
+        flash("Form created successfully!", "success")
+        return render_template('LecturerForm.html')
+
+    # For GET requests
     return render_template('LecturerForm.html')
+
+# Route for submission history lecturer
+@app.route('/SubmissionHistory')
+def history():
+    user_type = session.get('user_type')
+    username = session.get('username')
     
-#Route for submission status
-@app.route('/Status')
-def status():
-    current_user = Users.query.filter_by(username=session["username"]).first()
+    if not username:
+        flash("Please log in.")
+        return redirect(url_for('login'))
+    
+    if user_type != 'lecturer':
+        flash("You are not authorized to view this page.")
+        return redirect(url_for('index'))  
 
-    if session['user_type'] == 'lecturer':
-        # Get all courses owned by this lecturer
-        courses = Course.query.filter_by(lecturer_id=current_user.id).all()
-        course_ids = [course.id for course in courses]
+    user = Users.query.filter_by(username=username).first()
+    if not user:
+        flash("User not found.")
+        return redirect(url_for('login'))
 
-        # Get all submissions related to those courses (assuming submissions link to course/group with course_id)
-        submissions = Submission.query.filter(Submission.course_id.in_(course_ids)).all()
+    # Get list of distinct group names for filter dropdown 
+    group_names = db.session.query(Submission.group_name).distinct().order_by(Submission.group_name).all()
+    group_names = [g[0] for g in group_names if g[0]]  # Avoid None or empty
 
-        submissions = []
-        if course_ids:  # Only query if there are course IDs
-            submissions = Submission.query.filter(Submission.course_id.in_(course_ids)).all()
-        return render_template("status.html", submissions=submissions)
+    selected_group = request.args.get('group_name')
 
+    # Get all user_ids for students
+    student_ids = [u.id for u in Users.query.filter_by(user_type='student').all()]
+
+    if selected_group:
+        submissions = Submission.query.filter(
+            Submission.group_name == selected_group,
+            Submission.user_id.in_(student_ids)
+        ).order_by(Submission.timestamp.desc()).all()
     else:
-        # Show only submissions from this user's group
-        submissions = Submission.query.join(Users).filter(
-            Users.group_id == current_user.group_id
-        ).all()
+        submissions = Submission.query.filter(
+            Submission.user_id.in_(student_ids)
+        ).order_by(Submission.timestamp.desc()).all()
 
-        return render_template("status_s.html", submissions=submissions)
+    return render_template('SubmissionHistory.html',
+                           submissions=submissions,
+                           group_names=group_names,
+                           selected_group=selected_group)
 
-#Route to view a specific submission
+# Route to view a specific submission for lecturers 
 @app.route('/viewsubmission/<int:submission_id>')
 def view_submission(submission_id):
     submission = Submission.query.get_or_404(submission_id)
@@ -725,7 +596,159 @@ def view_submission(submission_id):
         return render_template('view_comment.html', submission=submission, comments=comments)
 
 
-#New combined route for updating both status and adding comment
+#ALL CODE RELATED TO BOTH STUDENT AND LECTURER!!!!!!!!!!!!!!
+# Route for submission status
+@app.route('/Status')
+def status():
+    current_user = Users.query.filter_by(username=session["username"]).first()
+
+    if session['user_type'] == 'lecturer':
+        # Get all courses owned by this lecturer
+        courses = Course.query.filter_by(lecturer_id=current_user.id).all()
+        course_ids = [course.id for course in courses]
+
+        submissions = []
+        if course_ids:  # Only query if there are course IDs
+            submissions = Submission.query.filter(Submission.course_id.in_(course_ids)).all() # Get all submissions related to those courses (assuming submissions link to course/group with course_id)
+        return render_template("status.html", submissions=submissions)
+
+    else:
+        # Show only submissions from this user's group
+        submissions = Submission.query.join(Users).filter(
+            Users.group_id == current_user.group_id
+        ).all()
+
+        return render_template("status_s.html", submissions=submissions)
+
+
+
+#ALL CODE RELATED TO SUBMIT, DOWNLOAD, AND ETC!!!!!!!!!!!!!!!!!!!!!
+# Route to handle student form submission
+@app.route('/submit', methods=['POST'])
+def submit():
+    if 'username' not in session:
+        flash("You must be logged in to submit.") 
+        return redirect(url_for('login'))
+
+    user = Users.query.filter_by(username=session['username']).first()
+    if not user:
+        flash("User not found.")
+        return redirect(url_for('login'))
+
+    # Get form data
+    group_name = request.form['Group_Name']
+    title = request.form['Title']
+    description = request.form['Description']
+    file = request.files.get('Upload_file')
+    submission_id = request.form.get("submission_id")
+
+    filename = None
+    if file and file.filename:
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+    form_id = request.form.get('form_id')  
+    due_date = None
+    form = None
+    is_late = False  
+
+    now = malaysia_time()  # Timezone-aware
+    if form_id:
+        try:
+            form_id_int = int(form_id)
+            form = FormTemplate.query.get(form_id_int)
+            if form and form.due_date:
+                due_date = form.due_date
+        except ValueError:
+            flash("Invalid form ID.", "danger")
+            return redirect(url_for('StudentForm'))
+        
+        if due_date and due_date.tzinfo is None:
+            malaysia = timezone('Asia/Kuala_Lumpur')
+            due_date = malaysia.localize(due_date)
+
+        if due_date and now > due_date:
+            is_late = True
+
+    # Use submission_id to check if editing
+    existing_submission = None
+    if submission_id:
+        try:
+            existing_submission = Submission.query.get(int(submission_id))
+        except ValueError:
+            flash("Invalid submission ID.")
+            return redirect(url_for('StudentForm'))
+
+    if existing_submission and existing_submission.user_id == user.id:
+    # Update existing submission
+        existing_submission.group_name = group_name
+        existing_submission.title = title
+        existing_submission.description = description
+        if filename:
+            existing_submission.filename = filename
+            existing_submission.timestamp = now
+            existing_submission.is_late = is_late
+            existing_submission.due_date = due_date
+            existing_submission.edited = True
+            db.session.commit()
+            flash("Submission updated successfully!", "info")
+            return redirect(url_for('student_history'))  
+    else:
+        # New submission
+        new_submission = Submission(
+            user_id=user.id,
+            group_name=group_name,
+            title=title,
+            description=description,
+            filename=filename,
+            timestamp=now,
+            is_late=is_late,
+            due_date=due_date,
+            edited=False
+        )
+        db.session.add(new_submission)
+        db.session.commit()
+        flash("Submission successful!", "success")
+        return redirect(url_for('StudentForm'))
+
+# Route to handle comment submission
+@app.route('/submit_comment/<int:submission_id>', methods=['POST'])
+def submit_comment(submission_id):
+    
+    # Only allow lecturers to submit comments
+    if 'user_type' not in session or session['user_type'] != 'lecturer':
+        flash("Access denied: You must be a lecturer to view this page.", "danger")
+        return redirect(url_for('index'))  
+    
+    # Ensure user is logged in and user_id is in session
+    if 'user_id' not in session:
+        abort(403)  # or redirect to login page
+    
+    comment_text = request.form.get('comment')
+    if not comment_text:
+        flash("Comment cannot be empty.")
+        return redirect(url_for('review_submission', submission_id=submission_id))
+
+    # Create and save the comment
+    new_comment = Comment(
+        submission_id=submission_id,
+        user_id=session['user_id'],
+        text=comment_text,
+        timestamp=datetime.utcnow()
+    )
+    db.session.add(new_comment)
+    db.session.commit()
+
+    flash("Comment submitted successfully!")
+    return redirect(url_for('review_submission', submission_id=submission_id))
+
+# Route to download files
+@app.route('/download/<filename>')
+def download(filename):
+    safe_filename = secure_filename(filename)
+    return send_from_directory(app.config['UPLOAD_FOLDER'], safe_filename, as_attachment=True)
+
+# Route for updating both status and adding comment
 @app.route("/update_status/<int:submission_id>", methods=["POST"])
 def update_status_and_comment(submission_id):
     submission = Submission.query.get_or_404(submission_id)
@@ -744,7 +767,8 @@ def update_status_and_comment(submission_id):
         comment = Comment(
             submission_id=submission.id,
             user_id=current_user.id,
-            text=comment_text
+            text=comment_text,
+            timestamp=datetime.utcnow()
         )
         db.session.add(comment)
 
@@ -752,5 +776,49 @@ def update_status_and_comment(submission_id):
 
     flash("Submission status and comment updated.")
     return redirect(url_for("view_submission", submission_id=submission.id))
+
+# Route to update a submission
+@app.route('/submit_edit/<int:submission_id>', methods=['POST'])
+def submit_edit(submission_id):
+    submission = Submission.query.get_or_404(submission_id)
+    if submission.user_id != session.get('user_id'):
+        abort(403)
+
+    # Update fields
+    submission.group_name = request.form.get('Group_Name')
+    submission.title = request.form.get('Title')
+    submission.description = request.form.get('Description')
+
+    # Handle file upload
+    file = request.files.get('Upload_file')
+    if file and file.filename != '':
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        submission.filename = filename
+        
+    # Mark as edited
+    submission.edited = True
+
+    db.session.commit()
+    flash('Submission updated successfully.')
+    return redirect(url_for('student_history'))  # Redirect to the student's history page
+
+@app.route('/delete_submission/<int:submission_id>', methods=['POST'])
+def delete_submission(submission_id):
+    if 'username' not in session:
+        return redirect(url_for('login'))
+
+    user = Users.query.filter_by(username=session['username']).first()
+    submission = Submission.query.get_or_404(submission_id)
+
+    if submission.user_id != user.id:
+        abort(403)  # Prevent deletion of others' submissions
+
+    db.session.delete(submission)
+    db.session.commit()
+    flash("Submission deleted successfully.", "info")
+    return redirect(url_for('student_history'))  # Redirect to the student's history page
+
+
 
 app.run(host="0.0.0.0", port=5000, debug=True)
