@@ -7,5 +7,6 @@
       <span class="badge badge-primary">Status : {{ submission['status'] }}</span>
       <p class="card-text">{{ submission['description'] }}</p>
         </div>
+        <a href="{{ url_for('edit_submission', submission_id=submission.id) }}" class="btn btn-primary">Edit</a>
   </div>
 {% endblock %}
