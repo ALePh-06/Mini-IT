@@ -391,6 +391,12 @@ def join_group():
 
     return render_template('JoinGroup.html')  # Create this template
 
+@app.route("/Logout")
+def logout():
+    session.clear()
+    flash("You have logged out succesfully")
+    return redirect(url_for("login"))
+
 @app.route('/')
 def index():
     courses = Course.query.all()
