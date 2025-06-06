@@ -15,43 +15,49 @@
         {% for original, edits in submissions.items() %}
             <div class="card mb-3">
                 <div class="card-body">
-                    <h5 class="card-title">{{ (edits[0] if edits else original).group_name }}</h5>
-                    <p>Title: {{ (edits[0] if edits else original).title }}</p>
-                    <p>Description: {{ (edits[0] if edits else original).description }}</p>
-                    <p>Timestamp: {{ (edits[0] if edits else original).timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                    {% set latest_sub = edits[0] if edits else original %}
+                    {% if latest_sub %}
+                        <h5 class="card-title">{{ latest_sub.group_name }}</h5>
+                        <p>Title: {{ latest_sub.title }}</p>
+                        <p>Description: {{ latest_sub.description }}</p>
+                        <p>Timestamp: {{ latest_sub.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</p>
 
-                     {% if (edits[0] if edits else original).filename %}
-                        <a href="{{ url_for('download', filename=(edits[0].filename if edits else original.filename)) }}" class="btn btn-link">Download File</a>
+                        {% if latest_sub.filename %}
+                            <a href="{{ url_for('download', filename=latest_sub.filename) }}" class="btn btn-link">Download File</a>
+                        {% endif %}
+
+                        <!-- Edit and Delete buttons for latest -->
+                        <a href="{{ url_for('edit_submission', submission_id=(edits[0].id if edits else original.id)) }}" class="btn btn-primary btn-sm">Edit</a>
+                        <form action="{{ url_for('delete_submission', submission_id=(edits[0].id if edits else original.id)) }}" method="post" style="display:inline;">
+                            <button type="submit" onclick="return confirm('Are you sure?');" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
+                    
+                    {% else %}
+                        <p class="text-danger">This submission is no longer available.</p>
                     {% endif %}
+                        <!-- Dropdown for previous versions -->
+                        {% if edits %}
+                            <button class="btn btn-secondary btn-sm mt-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOriginal{{ original.id }}" aria-expanded="false" aria-controls="collapseOriginal{{ original.id }}">
+                                Show Version Before
+                            </button>
 
-                    <!-- Edit and Delete buttons for latest -->
-                    <a href="{{ url_for('edit_submission', submission_id=(edits[0].id if edits else original.id)) }}" class="btn btn-primary btn-sm">Edit</a>
-                    <form action="{{ url_for('delete_submission', submission_id=(edits[0].id if edits else original.id)) }}" method="post" style="display:inline;">
-                        <button type="submit" onclick="return confirm('Are you sure?');" class="btn btn-danger btn-sm">Delete</button>
-                    </form>
-
-                    <!-- Dropdown for previous versions -->
-                    {% if edits %}
-                        <button class="btn btn-secondary btn-sm mt-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOriginal{{ original.id }}" aria-expanded="false" aria-controls="collapseOriginal{{ original.id }}">
-                            Show Original
-                        </button>
-
-                        <div class="collapse mt-2" id="collapseOriginal{{ original.id }}">
-                            <div class="card card-body">
-                                <h6>Original Version</h6>
-                                <p><strong>Group:</strong> {{ original.group_name }}</p>
-                                <p><strong>Title:</strong> {{ original.title }}</p>
-                                <p><strong>Description:</strong> {{ original.description }}</p>
-                                <p><strong>Timestamp:</strong> {{ original.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</p>
-                                {% if original.filename %}
-                                    <a href="{{ url_for('download', filename=original.filename) }}" class="btn btn-link">Download Original File</a>
-                                {% endif %}
+                            <div class="collapse mt-2" id="collapseOriginal{{ original.id }}">
+                                <div class="card card-body">
+                                    <h6>Version before</h6>
+                                    <p><strong>Group:</strong> {{ original.group_name }}</p>
+                                    <p><strong>Title:</strong> {{ original.title }}</p>
+                                    <p><strong>Description:</strong> {{ original.description }}</p>
+                                    <p><strong>Timestamp:</strong> {{ original.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                                    {% if original.filename %}
+                                        <a href="{{ url_for('download', filename=original.filename) }}" class="btn btn-link">Download Original File</a>
+                                    {% endif %}
+                                </div>
                             </div>
-                        </div>
-                    {% endif %}
+                        {% endif %}
+                    </div>
                 </div>
-            </div>
-        {% endfor %}
+            {% endfor %}
+        </div>
     </div>
 
     <!--  Bootstrap JS (required for collapse to work) -->

@@ -33,12 +33,12 @@
 
                 {% if edits %}
                     <button class="btn btn-secondary btn-sm mt-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOriginal{{ original.id }}" aria-expanded="false" aria-controls="collapseOriginal{{ original.id }}">
-                        Show Original
+                        Show Version Before
                     </button>
 
                     <div class="collapse mt-2" id="collapseOriginal{{ original.id }}">
                         <div class="card card-body">
-                            <h6>Original Version</h6>
+                            <h6>Version Before</h6>
                             <p><strong>Group:</strong> {{ original.group_name }}</p>
                             <p><strong>Title:</strong> {{ original.title }}</p>
                             <p><strong>Description:</strong> {{ original.description }}</p>
