@@ -9,6 +9,7 @@ import bcrypt
 import pytz
 from pytz import timezone
 from datetime import datetime
+from collections import defaultdict
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'mydatabase.db')
 
@@ -44,13 +45,7 @@ class Users(db.Model):
     password = db.Column(db.String, nullable=False)
     user_type = db.Column(db.String, nullable=False)
 
-    group_id = db.Column(db.Integer, db.ForeignKey('Group.id'))
-
-class Group(db.Model):
-    __tablename__ = 'Group'
-    id = db.Column(db.Integer, primary_key=True)
-    
-    course = db.relationship
+    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'))
 
 class Course(db.Model):
     __tablename__ = 'courses'
@@ -94,9 +89,17 @@ class Submission(db.Model):
     status = db.Column(db.String(50), default='Pending')
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'))
     edited = db.Column(db.Boolean, default=False)  
-    
+    original_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=True) # Original submission ID for edits
+
+
     user = db.relationship('Users', backref='submissions')
     form = db.relationship('FormTemplate', backref='submissions')
+    
+    edits = db.relationship(
+        "Submission",
+        cascade="all, delete-orphan",
+        backref=db.backref("original", remote_side=[id])
+    )
 
 #FormTemplate
 class FormTemplate(db.Model):
@@ -443,7 +446,7 @@ def malaysia_time():
 
 
 # Naufal Codes 
-
+# The code has been arranged to be more organized and readable.
 # ALL CODE RELATED TO STUDENT!!!!!!!!!!!!!!!!!!!!
 # Route to display student form
 @app.route('/StudentForm')
@@ -465,8 +468,10 @@ def student_forms():
 
     return render_template('FormExist.html', forms=forms, malaysia_time=malaysia_time)
 
-# Route for student history
-@app.route('/StudentHistory')
+from collections import defaultdict
+
+# Route to view student submission history
+@app.route('/Student/SubmissionHistory')
 def student_history():
     if 'username' not in session:
         flash("Please log in to view your submission history.")
@@ -474,10 +479,25 @@ def student_history():
 
     user = Users.query.filter_by(username=session['username']).first()
     if user.user_type != "student":
-        abort(403)  # Only students should access this page
+        abort(403)
 
-    submissions = Submission.query.filter_by(user_id=user.id).order_by(Submission.timestamp.desc()).all()
-    return render_template("StudentHistory.html", submissions=submissions)
+    all_submissions = Submission.query.filter_by(user_id=user.id).order_by(Submission.timestamp.desc()).all()
+
+    grouped = defaultdict(list)
+    originals = {}
+
+    for s in all_submissions:
+        if s.original_id:  # it's an edit
+            grouped[s.original_id].append(s)
+        else:  # it's an original
+            originals[s.id] = s
+
+    submissions_dict = {}
+    for orig_id, original in originals.items():
+        edits = sorted(grouped[orig_id], key=lambda x: x.timestamp, reverse=True)
+        submissions_dict[original] = edits
+
+    return render_template("StudentHistory.html", submissions=submissions_dict)
 
 # Route to edit a submission
 @app.route('/edit_submission/<int:submission_id>', methods=['GET'])
@@ -545,43 +565,53 @@ def create_form():
 def history():
     user_type = session.get('user_type')
     username = session.get('username')
-    
+
     if not username:
         flash("Please log in.")
         return redirect(url_for('login'))
-    
+
     if user_type != 'lecturer':
         flash("You are not authorized to view this page.")
-        return redirect(url_for('index'))  
+        return redirect(url_for('index'))
 
     user = Users.query.filter_by(username=username).first()
     if not user:
         flash("User not found.")
         return redirect(url_for('login'))
 
-    # Get list of distinct group names for filter dropdown 
+    # Get all unique group names
     group_names = db.session.query(Submission.group_name).distinct().order_by(Submission.group_name).all()
-    group_names = [g[0] for g in group_names if g[0]]  # Avoid None or empty
+    group_names = [g[0] for g in group_names if g[0]]
 
     selected_group = request.args.get('group_name')
 
-    # Get all user_ids for students
+    # Get all student user IDs
     student_ids = [u.id for u in Users.query.filter_by(user_type='student').all()]
 
+    # Query all submissions made by students (optionally filtered by group)
     if selected_group:
-        submissions = Submission.query.filter(
+        all_submissions = Submission.query.filter(
             Submission.group_name == selected_group,
             Submission.user_id.in_(student_ids)
         ).order_by(Submission.timestamp.desc()).all()
     else:
-        submissions = Submission.query.filter(
+        all_submissions = Submission.query.filter(
             Submission.user_id.in_(student_ids)
         ).order_by(Submission.timestamp.desc()).all()
 
+    # Group submissions by original (original or edited)
+    grouped = {}
+    for sub in all_submissions:
+        if sub.original_id:
+            grouped.setdefault(sub.original, []).append(sub)
+        else:
+            grouped.setdefault(sub, [])
+
     return render_template('SubmissionHistory.html',
-                           submissions=submissions,
+                           submissions=grouped,
                            group_names=group_names,
                            selected_group=selected_group)
+
 
 # Route to view a specific submission for lecturers 
 @app.route('/viewsubmission/<int:submission_id>')
@@ -780,29 +810,50 @@ def update_status_and_comment(submission_id):
 # Route to update a submission
 @app.route('/submit_edit/<int:submission_id>', methods=['POST'])
 def submit_edit(submission_id):
-    submission = Submission.query.get_or_404(submission_id)
-    if submission.user_id != session.get('user_id'):
+    old_submission = Submission.query.get_or_404(submission_id)
+    if old_submission.user_id != session.get('user_id'):
         abort(403)
 
-    # Update fields
-    submission.group_name = request.form.get('Group_Name')
-    submission.title = request.form.get('Title')
-    submission.description = request.form.get('Description')
+    # Find the original submission
+    if old_submission.original_id:
+        original_id = old_submission.original_id  # If it's an edit, get original id
+    else:
+        original_id = old_submission.id  # If original, use own id
+
+    # Get current user id from session or db lookup
+    user_id = session.get('user_id')
 
     # Handle file upload
     file = request.files.get('Upload_file')
+    filename = None
     if file and file.filename != '':
         filename = secure_filename(file.filename)
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        submission.filename = filename
-        
-    # Mark as edited
-    submission.edited = True
 
+    # Create new submission as an edit
+    new_submission = Submission(
+        user_id=user_id,
+        group_name=request.form.get('Group_Name'),
+        title=request.form.get('Title'),
+        description=request.form.get('Description'),
+        filename=filename if filename else old_submission.filename,
+        timestamp=datetime.now(),  
+        is_late=False,  
+        due_date=old_submission.due_date,
+        form_id=old_submission.form_id,
+        status='Pending',
+        course_id=old_submission.course_id,
+        edited=True,
+        original_id=original_id
+    )
+
+    db.session.add(new_submission)
     db.session.commit()
-    flash('Submission updated successfully.')
-    return redirect(url_for('student_history'))  # Redirect to the student's history page
 
+    flash('Submission updated successfully.')
+    return redirect(url_for('student_history'))
+
+# Route to delete a submission
 @app.route('/delete_submission/<int:submission_id>', methods=['POST'])
 def delete_submission(submission_id):
     if 'username' not in session:
@@ -812,12 +863,24 @@ def delete_submission(submission_id):
     submission = Submission.query.get_or_404(submission_id)
 
     if submission.user_id != user.id:
-        abort(403)  # Prevent deletion of others' submissions
+        abort(403)
 
-    db.session.delete(submission)
+    # Find the original submission
+    if submission.original_id:
+        original = Submission.query.get(submission.original_id)
+    else:
+        original = submission
+
+    # Delete the original and all edits
+    edits = Submission.query.filter_by(original_id=original.id).all()
+    for edit in edits:
+        db.session.delete(edit)
+    db.session.delete(original)
+
     db.session.commit()
-    flash("Submission deleted successfully.", "info")
-    return redirect(url_for('student_history'))  # Redirect to the student's history page
+
+    flash("Submission and all edits deleted successfully.", "info")
+    return redirect(url_for('student_history'))
 
 
 
