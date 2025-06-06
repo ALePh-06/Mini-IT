@@ -1,0 +1,30 @@
+<form action="{{ url_for('submit_edit', submission_id=submission.id) if submission else url_for('submit') }}" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="form_id" value="{{ form.id }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='FormStyle.css') }}">
+    
+    <div class="group-name">
+        <label for="Group_Name">Group Name:</label>
+        <input type="text" id="Group_Name" name="Group_Name" required value="{{ submission.group_name if submission else '' }}">
+    </div>
+
+    <div class="title">
+        <label for="Title">Title:</label>
+        <textarea id="Title" name="Title" required>{{ submission.title if submission else '' }}</textarea>
+    </div>
+
+    <div class="description">
+        <label for="Description">Description:</label>
+        <textarea id="Description" name="Description" required>{{ submission.description if submission else '' }}</textarea>
+    </div>
+
+    <label for="Upload_file">Upload file:</label>
+    {% if submission and submission.filename %}
+        <p>Current file: <a href="{{ url_for('download', filename=submission.filename) }}">{{ submission.filename }}</a></p>
+        <p>If you want to replace, upload a new file:</p>
+    {% endif %}
+    <input type="file" id="Upload_file" name="Upload_file" accept="image/png, image/jpeg, application/pdf"><br><br>
+
+    <hr>
+
+    <button class="submit-button" type="submit">{{ 'Update' if submission else 'Submit' }}</button>
+</form>

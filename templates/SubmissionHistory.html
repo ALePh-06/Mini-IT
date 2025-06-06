@@ -3,43 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <title>Submission History</title>
-    <style>
-        .late-submission {
-            color: red;
-            font-weight: bold;
-        }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-
 <body>
-    <h1>Submission History</h1>
+<div class="container mt-4">
+    <h2>Submission History</h2>
 
-    <ul>
-    {% for s in submissions %}
-        <li>
-            <strong>{{ s.group_name }}</strong> - {{ s.title }}<br>
-            {{ s.description }}<br>
-            <em>
-                <span class="{% if s.is_late %}late-submission{% endif %}">
-                    {{ s.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}
-                    {% if s.is_late %}(Late){% endif %}
-                </span>
-            </em><br>
-            {% if s.filename %}
-                <a href="{{ url_for('download', filename=s.filename) }}" download>Download File</a> 
-            {% endif %}
-        </li>
-        <hr>
-    {% endfor %}
-    </ul>
-
-    {% if session.user_type == 'lecturer' %}
-    <!-- Show group name filter dropdown -->
-    {% endif %}
-
-
-    <!-- Filter by Group Name -->
-    <form method="get" action="{{ url_for('history') }}">
+    <form method="get" action="{{ url_for('history') }}" class="mb-4">
         <label for="group_filter">Filter by Group Name:</label>
         <select name="group_name" id="group_filter" onchange="this.form.submit()">
             <option value="">All Groups</option>
@@ -49,6 +19,41 @@
         </select>
     </form>
 
-    <a href="/">Back to Form</a>
+    {% for original, edits in submissions.items() %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">{{ (edits[0] if edits else original).group_name }}</h5>
+                <p>Title: {{ (edits[0] if edits else original).title }}</p>
+                <p>Description: {{ (edits[0] if edits else original).description }}</p>
+                <p>Timestamp: {{ (edits[0] if edits else original).timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+
+                {% if (edits[0] if edits else original).filename %}
+                    <a href="{{ url_for('download', filename=(edits[0].filename if edits else original.filename)) }}" class="btn btn-link">Download File</a>
+                {% endif %}
+
+                {% if edits %}
+                    <button class="btn btn-secondary btn-sm mt-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOriginal{{ original.id }}" aria-expanded="false" aria-controls="collapseOriginal{{ original.id }}">
+                        Show Original
+                    </button>
+
+                    <div class="collapse mt-2" id="collapseOriginal{{ original.id }}">
+                        <div class="card card-body">
+                            <h6>Original Version</h6>
+                            <p><strong>Group:</strong> {{ original.group_name }}</p>
+                            <p><strong>Title:</strong> {{ original.title }}</p>
+                            <p><strong>Description:</strong> {{ original.description }}</p>
+                            <p><strong>Timestamp:</strong> {{ original.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                            {% if original.filename %}
+                                <a href="{{ url_for('download', filename=original.filename) }}" class="btn btn-link">Download Original File</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
