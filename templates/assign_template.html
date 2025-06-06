@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h2>Assign Template to {{ course.title }}</h2>
+
+<form method="POST">
+  <label for="template_id">Select a Template:</label>
+  <select name="template_id" id="template_id" class="form-control">
+    {% for template in templates %}
+      <option value="{{ template.id }}"
+        {% if current_assignment and template.id == current_assignment.template_id %}selected{% endif %}>
+        {{ template.name }}
+      </option>
+    {% endfor %}
+  </select>
+  <button type="submit" name="action" value="assign" class="btn btn-primary mt-2">Assign / Replace</button>
+</form>
+
+{% if current_assignment %}
+  <form method="POST" class="mt-3">
+    <button type="submit" name="action" value="remove" class="btn btn-danger">Remove Assigned Template</button>
+  </form>
+{% endif %}
+</div>
+
+{% endblock %}

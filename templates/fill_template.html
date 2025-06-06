@@ -1,0 +1,21 @@
+{% extends 'base_s.html' %}
+{% block content %}
+<h2>Fill Template: {{ template.name }}</h2>
+<form method="POST">
+  {% for field in fields %}
+    <div class="form-group">
+      <label>{{ field.field_name }}</label>
+      {% if field.field_type|lower == 'text' %}
+        <input type="Text" name="{{ field.id }}" class="form-control" required placeholder="short response">
+      {% elif field.field_type|lower == 'textarea' %}
+        <textarea name="{{ field.id }}" class="form-control" required placeholder="multi-line response"></textarea>
+      {% elif field.field_type|lower == 'date' %}
+        <input type="Date" name="{{ field.id }}" class="form-control" required>
+      {% elif field.field_type|lower == 'number' %}
+        <input type="Number" name="{{ field.id }}" class="form-control" required placeholder="numbers">
+      {% endif %}
+    </div>
+  {% endfor %}
+  <button type="submit" class="btn btn-success">Submit</button>
+</form>
+{% endblock %}

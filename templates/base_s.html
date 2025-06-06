@@ -28,6 +28,18 @@
               <a class="nav-link" href="{{url_for('JoinCourse')}}">Join Course</a>
             </li>
             </ul>
+
+            {% if session.get('username') %}
+            <ul class="navbar-nav ml-auto">
+              <li class="nav-item">
+                  <span class="navbar-text mr-2">Welcome, {{ session['username'] }}</span>
+              </li>
+              <li class="nav-item">
+                  <a class="btn btn-outline-danger" href="{{ url_for('logout') }}">Logout</a>
+              </li>
+          </ul>
+          {% endif %}
+
         </div>
     </nav>
     <div class="container">

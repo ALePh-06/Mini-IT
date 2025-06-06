@@ -40,8 +40,9 @@ def malaysia_time():
 
 class Users(db.Model):
     __tablename__ = 'users'
+    email = db.Column(db.String(120), unique=True, nullable=False)
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String, unique=True, nullable=False)
+    username = db.Column(db.String, unique=True, nullable=False, index=True)
     password = db.Column(db.String, nullable=False)
     user_type = db.Column(db.String, nullable=False)
 
@@ -57,6 +58,9 @@ class Course(db.Model):
 
     lecturer_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     lecturer = db.relationship('Users', backref='courses') 
+    templates = db.relationship('Template', backref='course', lazy=True)
+    groups = db.relationship('Group', backref='course', lazy=True)
+
 
 class Template(db.Model):
     __tablename__ = 'templates'
@@ -64,14 +68,30 @@ class Template(db.Model):
     name = db.Column(db.String, nullable=False)
 
     fields = db.relationship('TemplateField', backref='template', cascade="all, delete-orphan")
+    lecturer_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable = True)
 
 class TemplateField(db.Model):
     __tablename__ = 'template_fields'
     id = db.Column(db.Integer, primary_key=True)
     field_name = db.Column(db.String, nullable=False)
+    field_type = db.Column(db.String, nullable=False, default='text')
     field_order = db.Column(db.Integer, nullable=False)
 
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
+
+class AssignedTemplate(db.Model):
+    __tablename__ = 'assigned_templates'
+    id = db.Column(db.Integer, primary_key=True)
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+    template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
+
+    # Relationships
+    course = db.relationship('Course', backref='assigned_templates', lazy='joined')
+    template = db.relationship('Template', backref='assignments', lazy='joined')
+    
+    def __repr__(self):
+        return f'<AssignedTemplate {self.template.name} -> {self.course.title}>'
 
 #Database model
 class Submission(db.Model):
@@ -150,6 +170,7 @@ class SubmissionSettings(db.Model):
 
 #Student course model
 class StudentCourse(db.Model):
+    __tablename__ = 'student_course'
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
@@ -205,14 +226,12 @@ def get_submission(submission_id):
         abort(404)
     return submission
 
+def get_current_user():
+    return Users.query.filter_by(username=session.get('username')).first()
+
 
 with app.app_context():
     db.create_all()
-
-# Muiz's codes
-
-# Adding app secret key
-app.secret_key = "#83yUi_a"
 
 @app.before_request
 def require_login():
@@ -250,6 +269,7 @@ def signup():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
+        email = request.form.get("email", "").strip().lower()
         ConfirmPassword = request.form.get("ConfirmPassword", "").strip()
         special_code = request.form.get("special_code", "").strip()
 
@@ -270,8 +290,14 @@ def signup():
         # Check if username is unique
         try:
             existing_user = Users.query.filter_by(username=username).first()
+            existing_email = Users.query.filter_by(email=email).first()
+
             if existing_user:
                 flash("Username already exists. Please choose a different username.")
+                return redirect(url_for("signup"))
+            
+            if existing_email:
+                flash("This Email has been taken")
                 return redirect(url_for("signup"))
             
             # Save user to database
@@ -319,6 +345,58 @@ def JoinCourse():
 
     return render_template('JoinCourse.html')
 
+@app.route('/JoinGroup', methods=['GET', 'POST'])
+def join_group():
+    if 'user_type' not in session or session['user_type'] != 'student':
+        flash('You must be logged in as a student to join a group.')
+        return redirect(url_for('login'))
+
+    user = Users.query.filter_by(username=session['username']).first()
+    if not user:
+        flash('User not found.')
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        group_name = request.form['group_name'].strip()
+
+        group = Group.query.filter_by(name=group_name).first()
+        if not group:
+            flash('Group not found. Please check the group name.')
+            return redirect(url_for('join_group'))
+
+        # Check if already in a group for this course
+        course_id = group.course_id
+        joined_group_ids = db.session.query(Group.id).join(GroupMembers).filter(
+            Group.course_id == course_id,
+            GroupMembers.user_id == user.id
+        ).all()
+
+        if joined_group_ids:
+            flash('You have already joined a group for this course.')
+            return redirect(url_for('join_group'))
+
+        # Check group member count
+        member_count = GroupMembers.query.filter_by(group_id=group.id).count()
+        if member_count >= 4:
+            flash('Group is full (max 4 members).')
+            return redirect(url_for('join_group'))
+
+        # Join the group
+        membership = GroupMembers(group_id=group.id, user_id=user.id)
+        db.session.add(membership)
+        db.session.commit()
+
+        flash(f"You have successfully joined group '{group.name}'.")
+        return redirect(url_for('index'))
+
+    return render_template('JoinGroup.html')  # Create this template
+
+@app.route("/Logout")
+def logout():
+    session.clear()
+    flash("You have logged out succesfully")
+    return redirect(url_for("login"))
+
 @app.route('/')
 def index():
     courses = Course.query.all()
@@ -335,7 +413,12 @@ def index():
 @app.route('/course/<int:course_id>')
 def view_course(course_id):
     course = get_course(course_id)
-    return render_template('view_course.html', course=course)
+    assigned_templates = AssignedTemplate.query.filter_by(course_id=course_id).all()
+
+    if session['user_type'] == 'lecturer':
+        return render_template('view_course.html', course=course, assigned_templates=assigned_templates)  # Create this template
+    else:
+        return render_template('view_course_s.html', course=course, assigned_templates=assigned_templates)
 
 @app.route('/create_course', methods=('GET', 'POST'))
 def create_course():
@@ -362,9 +445,12 @@ def create_course():
 
 @app.route('/create_template', methods=('GET', 'POST'))
 def create_template():
+    current_user = get_current_user()
+    
     if request.method == 'POST':
         template_name = request.form['name']
         field_names = request.form.getlist('field_name[]')
+        field_types = request.form.getlist('field_type[]')  # <-- collect types properly
 
         if not template_name:
             flash('Template name is required.')
@@ -372,19 +458,21 @@ def create_template():
             flash('At least one field name is required.')
         else:
             # Create the template
-            new_template = Template(name=template_name)
+            new_template = Template(name=template_name, lecturer_id=current_user.id)
             db.session.add(new_template)
             db.session.commit()
 
             # Add fields linked to the template
-            for i, fname in enumerate(field_names):
+            for i, (fname, ftype) in enumerate(zip(field_names, field_types)):
                 if fname.strip():
                     new_field = TemplateField(
                         field_name=fname.strip(),
+                        field_type=ftype.strip() if ftype else 'text',  # default to 'text' if empty
                         field_order=i,
                         template_id=new_template.id
                     )
                     db.session.add(new_field)
+
             db.session.commit()
             flash('Template created successfully!')
             return redirect(url_for('index'))
@@ -395,6 +483,81 @@ def create_template():
 def view_template():
     templates = Template.query.all()
     return render_template('view_template.html', templates=templates)
+
+@app.route('/course/<int:course_id>/assign_template', methods=['GET', 'POST'])
+def assign_template_to_course(course_id):
+    # Only lecturers can assign
+    if session.get('user_type') != 'lecturer':
+        flash('Access denied: Only lecturers can assign templates.')
+        return redirect(url_for('index_s'))
+
+    course = get_course(course_id)
+    current_user = get_current_user()
+
+    # Ensure the lecturer owns this course
+    if course.lecturer_id != current_user.id:
+        flash('You can only assign templates to your own courses.')
+        return redirect(url_for('view_course', course_id=course_id))
+
+    templates = Template.query.filter_by(lecturer_id=current_user.id).all()
+    current_assignment = AssignedTemplate.query.filter_by(course_id=course_id).first()
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        # Handle template removal
+        if action == 'remove':
+            if current_assignment:
+                db.session.delete(current_assignment)
+                db.session.commit()
+                flash('Template removed from course.', 'success')
+            else:
+                flash('No template was assigned.', 'info')
+            return redirect(url_for('view_course', course_id=course_id))
+        
+        # Assign new or replace
+        template_id = request.form.get('template_id')
+        if not template_id:
+            flash('Please select a template.', 'warning')
+            return redirect(request.url)
+        
+        if current_assignment:
+            current_assignment.template_id = template_id  # Replace existing
+        else:
+            new_assignment = AssignedTemplate(course_id=course_id, template_id=template_id)
+            db.session.add(new_assignment)
+
+        db.session.commit()
+        flash('Template assigned/replaced successfully.', 'success')
+        return redirect(url_for('view_course', course_id=course_id))
+
+    return render_template(
+        'assign_template.html',
+        course=course,
+        templates=templates,
+        current_assignment=current_assignment
+    )
+@app.route('/course/<int:course_id>/assigned-templates')
+def view_assigned_templates(course_id):
+    if session.get('user_type') != 'student':
+        flash('You must be a student to view.')
+        abort(403)
+
+    current_user = get_current_user()
+
+    enrolled = StudentCourse.query.filter_by(student_id=current_user.id, course_id=course_id).first()
+    if not enrolled:
+        abort(403)
+
+    assigned_templates = (
+        AssignedTemplate.query
+        .filter_by(course_id=course_id)
+        .join(Template)
+        .all()
+    )
+
+    return render_template('view_template_s.html', assigned_templates=assigned_templates)
+
 
 @app.route('/edit_course/<int:id>', methods=('GET', 'POST'))
 def edit_course(id):
@@ -432,8 +595,8 @@ def edit_template(id):
 
     return render_template('edit.html', template=template)
 
-@app.route('/<int:id>/delete', methods=('POST',))
-def delete(id):
+@app.route('/course/<int:id>/delete', methods=('POST',))
+def delete_course(id):
     course = get_course(id)
     db.session.delete(course)
     db.session.commit()
@@ -444,6 +607,48 @@ def delete(id):
 def malaysia_time():
     return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
 
+@app.route('/course/<int:course_id>/fill_template', methods=['GET', 'POST'])
+def fill_template(course_id):
+    if session.get('user_type') != 'student':
+        flash('Access denied: Only students can fill templates.')
+        return redirect(url_for('index'))
+
+    student = get_current_user()
+
+    # Get assigned template for this course
+    assignment = AssignedTemplate.query.filter_by(course_id=course_id).first()
+    if not assignment:
+        flash('No template assigned to this course yet.')
+        return redirect(url_for('view_course', course_id=course_id))
+
+    template = Template.query.get(assignment.template_id)
+    fields = TemplateField.query.filter_by(template_id=template.id).all()
+
+    if request.method == 'POST':
+        # Create submission record
+        submission = Submission(
+            student_id=student.id,
+            template_id=template.id,
+            course_id=course_id
+        )
+        db.session.add(submission)
+        db.session.commit()
+
+        # Save each field answer
+        for field in fields:
+            answer = request.form.get(str(field.id))
+            field_answer = SubmissionFieldAnswer(
+                submission_id=submission.id,
+                field_id=field.id,
+                answer=answer
+            )
+            db.session.add(field_answer)
+
+        db.session.commit()
+        flash('Template submitted successfully.', 'success')
+        return redirect(url_for('view_course', course_id=course_id))
+
+    return render_template('fill_template.html', template=template, fields=fields, course_id=course_id)
 
 # Naufal Codes 
 # The code has been arranged to be more organized and readable.
@@ -451,22 +656,31 @@ def malaysia_time():
 # Route to display student form
 @app.route('/StudentForm')
 def StudentForm():
-    form = FormTemplate.query.first()  # Get any form
-    return render_template('StudentForm.html', form=form)
-
-# Route to display available forms for students
-@app.route('/Student/AvailableForms')
-def student_forms():
-    now = malaysia_time()
-    malaysia_tz = pytz.timezone('Asia/Kuala_Lumpur')
-    forms = FormTemplate.query.order_by(FormTemplate.due_date).all()
-
-    #Localize any naive due_date
-    for form in forms:
-        if form.due_date and form.due_date.tzinfo is None:
-            form.due_date = malaysia_tz.localize(form.due_date)
-
-    return render_template('FormExist.html', forms=forms, malaysia_time=malaysia_time)
+    # Get student's enrolled courses
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    
+    current_user = Users.query.filter_by(username=session['username']).first()
+    if current_user.user_type != 'student':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    # Get courses student is enrolled in
+    enrolled_courses = db.session.query(Course).join(StudentCourse).filter(
+        StudentCourse.student_id == current_user.id
+    ).all()
+    
+    # Get active assignments for enrolled courses
+    course_ids = [course.id for course in enrolled_courses]
+    available_assignments = []
+    
+    if course_ids:
+        available_assignments = AssignedTemplate.query.filter(
+            AssignedTemplate.course_id.in_(course_ids),).all()
+    
+    return render_template('StudentForm.html', 
+                         assignments=available_assignments,
+                         enrolled_courses=enrolled_courses)
 
 from collections import defaultdict
 
