@@ -4,5 +4,37 @@
     <h2>{% block title %} {{ course['title'] }} {% endblock %}</h2>
     <span class="badge badge-primary">Trimester : {{ course['trimester'] }}</span>
     <p>Course code : {{ course['code'] }}</p>
-    <p>{{ course['content'] }}</p>
+    
+    <div class="assigned-templates-section mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>Assigned Templates</h3>
+        <div>
+        <a href="{{ url_for('assign_template_to_course', course_id=course.id) }}" class="btn btn-primary mr-2">
+            Assign Template
+          </a>
+    </div>
+  
+    {% if assigned_templates %}
+        <div class="row">
+        {% for assignment in assigned_templates %}
+            <div class="col-12 col-md-6 col-lg-4 mb-3">
+              <div class="card h-100">
+                <div class="card-body">
+                <h4 class="card-title h5 mb-2">{{ assignment.template.name }}</h4>
+                </div>
+            </div>
+            </div>
+        {% endfor %}
+        </div>
+    
+  {% else %}
+    <div class="text-center text-muted py-4">
+      <p class="mb-2">No templates assigned yet.</p>
+      <a href="{{ url_for('assign_template_to_course', course_id=course.id) }}">
+        Assign your first template
+      </a>
+    </div>
+  {% endif %}
+</div>
+<p>{{ course['content'] }}</p>
 {% endblock %}
