@@ -39,6 +39,7 @@ def malaysia_time():
 
 class Users(db.Model):
     __tablename__ = 'users'
+    email = db.Column(db.String(120), unique=True, nullable=False)
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String, unique=True, nullable=False)
     password = db.Column(db.String, nullable=False)
@@ -248,6 +249,7 @@ def signup():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
+        email = request.form.get("email", "").strip().lower()
         ConfirmPassword = request.form.get("ConfirmPassword", "").strip()
         special_code = request.form.get("special_code", "").strip()
 
@@ -268,8 +270,14 @@ def signup():
         # Check if username is unique
         try:
             existing_user = Users.query.filter_by(username=username).first()
+            existing_email = Users.query.filter_by(email=email).first()
+
             if existing_user:
                 flash("Username already exists. Please choose a different username.")
+                return redirect(url_for("signup"))
+            
+            if existing_email:
+                flash("This Email has been taken")
                 return redirect(url_for("signup"))
             
             # Save user to database
@@ -316,6 +324,52 @@ def JoinCourse():
         return redirect(url_for('index'))
 
     return render_template('JoinCourse.html')
+
+@app.route('/JoinGroup', methods=['GET', 'POST'])
+def join_group():
+    if 'user_type' not in session or session['user_type'] != 'student':
+        flash('You must be logged in as a student to join a group.')
+        return redirect(url_for('login'))
+
+    user = Users.query.filter_by(username=session['username']).first()
+    if not user:
+        flash('User not found.')
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        group_name = request.form['group_name'].strip()
+
+        group = Group.query.filter_by(name=group_name).first()
+        if not group:
+            flash('Group not found. Please check the group name.')
+            return redirect(url_for('join_group'))
+
+        # Check if already in a group for this course
+        course_id = group.course_id
+        joined_group_ids = db.session.query(Group.id).join(GroupMembers).filter(
+            Group.course_id == course_id,
+            GroupMembers.user_id == user.id
+        ).all()
+
+        if joined_group_ids:
+            flash('You have already joined a group for this course.')
+            return redirect(url_for('join_group'))
+
+        # Check group member count
+        member_count = GroupMembers.query.filter_by(group_id=group.id).count()
+        if member_count >= 4:
+            flash('Group is full (max 4 members).')
+            return redirect(url_for('join_group'))
+
+        # Join the group
+        membership = GroupMembers(group_id=group.id, user_id=user.id)
+        db.session.add(membership)
+        db.session.commit()
+
+        flash(f"You have successfully joined group '{group.name}'.")
+        return redirect(url_for('index'))
+
+    return render_template('JoinGroup.html')  # Create this template
 
 @app.route('/')
 def index():
