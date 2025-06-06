@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h2>Templates for Course</h2>
+
+  {% if assigned_templates %}
+    <ul class="list-group">
+    {% for a in assigned_templates %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        {{ a.template.name }}
+        <a href="{{ url_for('fill_template', assigned_template_id=a.id) }}" class="btn btn-sm btn-success">Fill</a>
+      </li>
+    {% endfor %}
+    </ul>
+  {% else %}
+    <p>No templates assigned yet.</p>
+  {% endif %}
+{% endblock %}
