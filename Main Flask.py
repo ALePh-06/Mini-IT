@@ -301,7 +301,7 @@ def signup():
                 return redirect(url_for("signup"))
             
             # Save user to database
-            new_user = Users(username=username, password=hashed_password, user_type=user_type)
+            new_user = Users(username=username, password=hashed_password, user_type=user_type, email=email)
             db.session.add(new_user)
             db.session.commit()
 
