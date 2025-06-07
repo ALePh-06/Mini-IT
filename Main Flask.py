@@ -595,7 +595,7 @@ def fill_template(course_id):
         flash('Access denied: Only students can fill templates.')
         return redirect(url_for('index'))
 
-    group_id = get_student_group_id(course_id=course_id)
+    group_id = session.get('user_id')
 
     # Get assigned template for this course
     assignment = AssignedTemplate.query.filter_by(course_id=course_id).first()
@@ -612,7 +612,6 @@ def fill_template(course_id):
             group_id=group_id,
             template_id=template.id,
             course_id=course_id,
-            date = malaysia_time()
         )
         db.session.add(submission)
         db.session.commit()
@@ -677,7 +676,7 @@ def student_history():
     return render_template("StudentHistory.html", submissions=submissions_dict)
 
 
-
+# LECTURER CODE!!!!!
 # Route to edit a submission
 @app.route('/edit_submission/<int:submission_id>', methods=['GET'])
 def edit_submission(submission_id):
