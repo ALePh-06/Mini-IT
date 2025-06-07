@@ -97,24 +97,14 @@ class AssignedTemplate(db.Model):
 class Submission(db.Model):
     __tablename__ = 'submissions'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    group_name = db.Column(db.String(255), nullable=False)
-    title = db.Column(db.Text, nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    filename = db.Column(db.String(255))
-    timestamp = db.Column(db.DateTime, default=malaysia_time)
-    is_late = db.Column(db.Boolean, default=False)
-    due_date = db.Column(db.DateTime)
-    form_id = db.Column(db.Integer, db.ForeignKey('form_templates.id'), nullable=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False)
+    template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
+    date = db.Column(db.DateTime, nullable=False, default=malaysia_time())
     status = db.Column(db.String(50), default='Pending')
-    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'))
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
     edited = db.Column(db.Boolean, default=False)  
     original_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=True) # Original submission ID for edits
 
-
-    user = db.relationship('Users', backref='submissions')
-    form = db.relationship('FormTemplate', backref='submissions')
-    
     edits = db.relationship(
         "Submission",
         cascade="all, delete-orphan",
@@ -230,6 +220,17 @@ def get_current_user():
     return Users.query.filter_by(username=session.get('username')).first()
 
 
+def get_student_group_id(course_id):
+    student_id = get_current_user()
+
+    group_member = db.session.query(Group.id).join(GroupMembers).filter(
+        Group.course_id == course_id,
+        GroupMembers.student_id == student_id
+    ).first()
+
+    return group_member.id if group_member else None
+
+
 with app.app_context():
     db.create_all()
 
@@ -301,7 +302,7 @@ def signup():
                 return redirect(url_for("signup"))
             
             # Save user to database
-            new_user = Users(username=username, password=hashed_password, user_type=user_type)
+            new_user = Users(username=username, email=email, password=hashed_password, user_type=user_type)
             db.session.add(new_user)
             db.session.commit()
 
@@ -345,8 +346,8 @@ def JoinCourse():
 
     return render_template('JoinCourse.html')
 
-@app.route('/JoinGroup', methods=['GET', 'POST'])
-def join_group():
+@app.route('/course/<int:course_id>/JoinGroup', methods=['GET', 'POST'])
+def join_group(course_id):
     if 'user_type' not in session or session['user_type'] != 'student':
         flash('You must be logged in as a student to join a group.')
         return redirect(url_for('login'))
@@ -537,26 +538,6 @@ def assign_template_to_course(course_id):
         templates=templates,
         current_assignment=current_assignment
     )
-@app.route('/course/<int:course_id>/assigned-templates')
-def view_assigned_templates(course_id):
-    if session.get('user_type') != 'student':
-        flash('You must be a student to view.')
-        abort(403)
-
-    current_user = get_current_user()
-
-    enrolled = StudentCourse.query.filter_by(student_id=current_user.id, course_id=course_id).first()
-    if not enrolled:
-        abort(403)
-
-    assigned_templates = (
-        AssignedTemplate.query
-        .filter_by(course_id=course_id)
-        .join(Template)
-        .all()
-    )
-
-    return render_template('view_template_s.html', assigned_templates=assigned_templates)
 
 
 @app.route('/edit_course/<int:id>', methods=('GET', 'POST'))
@@ -613,7 +594,7 @@ def fill_template(course_id):
         flash('Access denied: Only students can fill templates.')
         return redirect(url_for('index'))
 
-    student = get_current_user()
+    group_id = get_student_group_id(course_id=course_id)
 
     # Get assigned template for this course
     assignment = AssignedTemplate.query.filter_by(course_id=course_id).first()
@@ -627,9 +608,10 @@ def fill_template(course_id):
     if request.method == 'POST':
         # Create submission record
         submission = Submission(
-            student_id=student.id,
+            group_id=group_id,
             template_id=template.id,
-            course_id=course_id
+            course_id=course_id,
+            date = malaysia_time()
         )
         db.session.add(submission)
         db.session.commit()
@@ -650,40 +632,6 @@ def fill_template(course_id):
 
     return render_template('fill_template.html', template=template, fields=fields, course_id=course_id)
 
-# Naufal Codes 
-# The code has been arranged to be more organized and readable.
-# ALL CODE RELATED TO STUDENT!!!!!!!!!!!!!!!!!!!!
-# Route to display student form
-@app.route('/StudentForm')
-def StudentForm():
-    # Get student's enrolled courses
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    
-    current_user = Users.query.filter_by(username=session['username']).first()
-    if current_user.user_type != 'student':
-        flash('Access denied.', 'danger')
-        return redirect(url_for('index'))
-    
-    # Get courses student is enrolled in
-    enrolled_courses = db.session.query(Course).join(StudentCourse).filter(
-        StudentCourse.student_id == current_user.id
-    ).all()
-    
-    # Get active assignments for enrolled courses
-    course_ids = [course.id for course in enrolled_courses]
-    available_assignments = []
-    
-    if course_ids:
-        available_assignments = AssignedTemplate.query.filter(
-            AssignedTemplate.course_id.in_(course_ids),).all()
-    
-    return render_template('StudentForm.html', 
-                         assignments=available_assignments,
-                         enrolled_courses=enrolled_courses)
-
-from collections import defaultdict
-
 # Route to view student submission history
 @app.route('/Student/SubmissionHistory')
 def student_history():
@@ -691,7 +639,7 @@ def student_history():
         flash("Please log in to view your submission history.")
         return redirect(url_for('login'))
 
-    user = Users.query.filter_by(username=session['username']).first()
+    user = get_current_user()
     if user.user_type != "student":
         abort(403)
 
@@ -723,56 +671,6 @@ def edit_submission(submission_id):
         abort(403)
     form = FormTemplate.query.first()  # Get the first form template, or modify to get a specific one if needed
     return render_template('edit_submission.html', submission=submission, form=form)
-
-
-# ALL CODE RELATED TO LECTURER!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# Route to display lecturer form creation page
-@app.route('/create_form', methods=['GET', 'POST'])
-def create_form():
-    # Restrict access to lecturers only
-    if 'user_type' not in session or session['user_type'] != 'lecturer':
-        flash("Access denied: You must be a lecturer to view this page.", "danger")
-        return redirect(url_for('index'))  
-    
-    if request.method == 'POST':
-        title = request.form['Title']
-        description = request.form['Description']
-        file = request.files.get('Upload_file')
-        due_date_str = request.form.get('due_date')
-
-        due_date = None
-
-        try:
-            if due_date_str:
-                due_date = datetime.strptime(due_date_str, "%Y-%m-%dT%H:%M")
-        except ValueError:
-            flash("Invalid date format.", "error")
-            return render_template('LecturerForm.html')
-
-        filename = None
-        if file and file.filename:
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-
-        # Localize due_date to Malaysia time
-        malaysia_tz = pytz.timezone('Asia/Kuala_Lumpur')
-        if due_date:
-            due_date = malaysia_tz.localize(due_date)
-
-        new_form = FormTemplate(
-            title=title,
-            description=description,
-            filename=filename,
-            due_date=due_date
-        )
-        db.session.add(new_form)
-        db.session.commit()
-
-        flash("Form created successfully!", "success")
-        return render_template('LecturerForm.html')
-
-    # For GET requests
-    return render_template('LecturerForm.html')
 
 # Route for submission history lecturer
 @app.route('/SubmissionHistory')
@@ -985,12 +883,6 @@ def submit_comment(submission_id):
 
     flash("Comment submitted successfully!")
     return redirect(url_for('review_submission', submission_id=submission_id))
-
-# Route to download files
-@app.route('/download/<filename>')
-def download(filename):
-    safe_filename = secure_filename(filename)
-    return send_from_directory(app.config['UPLOAD_FOLDER'], safe_filename, as_attachment=True)
 
 # Route for updating both status and adding comment
 @app.route("/update_status/<int:submission_id>", methods=["POST"])
