@@ -389,7 +389,7 @@ def join_group():
         flash(f"You have successfully joined group '{group.name}'.")
         return redirect(url_for('index'))
 
-    return render_template('JoinGroup.html')  # Create this template
+    return render_template('GroupJoining.html')  # Create this template
 
 @app.route("/Logout")
 def logout():
