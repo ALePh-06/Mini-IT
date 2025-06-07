@@ -9,15 +9,24 @@
         h1, h2 { color: #333; }
         .comment { margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
         .status { font-weight: bold; color: #007BFF; }
+        .field-answer { margin-bottom: 10px; }
+        .field-name { font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Submission Details</h1>
-        <p><strong>Group Name:</strong> {{ submission.group_name }}</p>
-        <p><strong>Title:</strong> {{ submission.title }}</p>
-        <p><strong>Description:</strong> {{ submission.description }}</p>
-        <p><strong>Submitted At:</strong> {{ submission.timestamp.strftime('%d %B %Y %H:%M:%S') }}</p>
+        {% if answers %}
+            {% for answer in answers %}
+                <div class="field-answer">
+                    <span class="field-name">{{ fields[answer.field_id].field_name if fields.get(answer.field_id) else "Unknown Field" }}:</span>
+                    <span class="field-value">{{ answer.value }}</span>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No answers submitted yet.</p>
+        {% endif %}
+        <p><strong>Submitted At:</strong> {{ submission.date.strftime('%d %B %Y %H:%M:%S') }}</p>
         <p class="status"><strong>Status:</strong> {{ submission.status }}</p>
 
         <hr>
