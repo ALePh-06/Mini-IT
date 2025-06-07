@@ -301,7 +301,7 @@ def signup():
                 return redirect(url_for("signup"))
             
             # Save user to database
-            new_user = Users(username=username, password=hashed_password, user_type=user_type)
+            new_user = Users(username=username, password=hashed_password, user_type=user_type, email=email)
             db.session.add(new_user)
             db.session.commit()
 
@@ -678,14 +678,15 @@ def StudentForm():
         available_assignments = AssignedTemplate.query.filter(
             AssignedTemplate.course_id.in_(course_ids),).all()
     
+    form = AssignedTemplate.query.first()
     return render_template('StudentForm.html', 
                          assignments=available_assignments,
-                         enrolled_courses=enrolled_courses)
+                         enrolled_courses=enrolled_courses,
+                         form=form)
 
-from collections import defaultdict
 
 # Route to view student submission history
-@app.route('/Student/SubmissionHistory')
+@app.route('/Student/History')
 def student_history():
     if 'username' not in session:
         flash("Please log in to view your submission history.")
@@ -695,23 +696,30 @@ def student_history():
     if user.user_type != "student":
         abort(403)
 
+    # Get all submissions for this user
     all_submissions = Submission.query.filter_by(user_id=user.id).order_by(Submission.timestamp.desc()).all()
 
-    grouped = defaultdict(list)
-    originals = {}
-
+    # Build chains by original_id
+    chains = defaultdict(list)
     for s in all_submissions:
-        if s.original_id:  # it's an edit
-            grouped[s.original_id].append(s)
-        else:  # it's an original
-            originals[s.id] = s
+        key = s.original_id if s.original_id else s.id
+        chains[key].append(s)
 
+    # Build display dictionary: latest as key, second-latest as dropdown
     submissions_dict = {}
-    for orig_id, original in originals.items():
-        edits = sorted(grouped[orig_id], key=lambda x: x.timestamp, reverse=True)
-        submissions_dict[original] = edits
+    for chain in chains.values():
+        sorted_chain = sorted(chain, key=lambda x: x.timestamp, reverse=True)
+        previous = sorted_chain[0]
+        latest = sorted_chain[1] if len(sorted_chain) > 1 else None
+        if previous:  # only include if there's a valid submission
+            if latest:
+                submissions_dict[latest] = [previous]
+            else:
+                submissions_dict[previous] = []
+
 
     return render_template("StudentHistory.html", submissions=submissions_dict)
+
 
 # Route to edit a submission
 @app.route('/edit_submission/<int:submission_id>', methods=['GET'])
@@ -813,16 +821,22 @@ def history():
             Submission.user_id.in_(student_ids)
         ).order_by(Submission.timestamp.desc()).all()
 
-    # Group submissions by original (original or edited)
-    grouped = {}
-    for sub in all_submissions:
-        if sub.original_id:
-            grouped.setdefault(sub.original, []).append(sub)
-        else:
-            grouped.setdefault(sub, [])
+    # Build chains by original_id
+    chains = defaultdict(list)
+    for s in all_submissions:
+        key = s.original_id if s.original_id else s.id
+        chains[key].append(s)
+
+    # Keep only latest and one previous version
+    submissions_dict = {}
+    for chain in chains.values():
+        sorted_chain = sorted(chain, key=lambda x: x.timestamp, reverse=True)
+        previous = sorted_chain[0]
+        latest = sorted_chain[1] if len(sorted_chain) > 1 else None
+        submissions_dict[latest] = [previous] if previous else []
 
     return render_template('SubmissionHistory.html',
-                           submissions=grouped,
+                           submissions=submissions_dict,
                            group_names=group_names,
                            selected_group=selected_group)
 
@@ -857,12 +871,21 @@ def status():
         return render_template("status.html", submissions=submissions)
 
     else:
-        # Show only submissions from this user's group
-        submissions = Submission.query.join(Users).filter(
+        # Get all submissions in the user's group
+        all_submissions = Submission.query.join(Users).filter(
             Users.group_id == current_user.group_id
-        ).all()
+        ).order_by(Submission.timestamp.desc()).all()
 
-        return render_template("status_s.html", submissions=submissions)
+        # Group by original submission ID or own ID
+        chains = defaultdict(list)
+        for s in all_submissions:
+            key = s.original_id if s.original_id else s.id
+            chains[key].append(s)
+
+        # Keep only the latest version of each chain
+        latest_submissions = [sorted(subs, key=lambda x: x.timestamp, reverse=True)[0] for subs in chains.values()]
+
+        return render_template("status_s.html", submissions=latest_submissions)
 
 
 
@@ -896,7 +919,7 @@ def submit():
     form = None
     is_late = False  
 
-    now = malaysia_time()  # Timezone-aware
+    now = datetime.now(malaysia_time)  # Timezone-aware
     if form_id:
         try:
             form_id_int = int(form_id)
@@ -978,7 +1001,7 @@ def submit_comment(submission_id):
         submission_id=submission_id,
         user_id=session['user_id'],
         text=comment_text,
-        timestamp=datetime.utcnow()
+        timestamp=datetime.now(malaysia_time)  
     )
     db.session.add(new_comment)
     db.session.commit()
@@ -997,6 +1020,8 @@ def download(filename):
 def update_status_and_comment(submission_id):
     submission = Submission.query.get_or_404(submission_id)
 
+    malaysia_time = pytz.timezone('Asia/Kuala_Lumpur')
+
     if session.get("user_type") != "lecturer":
         abort(403)
 
@@ -1012,7 +1037,7 @@ def update_status_and_comment(submission_id):
             submission_id=submission.id,
             user_id=current_user.id,
             text=comment_text,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(malaysia_time)  
         )
         db.session.add(comment)
 
@@ -1021,6 +1046,8 @@ def update_status_and_comment(submission_id):
     flash("Submission status and comment updated.")
     return redirect(url_for("view_submission", submission_id=submission.id))
 
+malaysia_time = pytz.timezone('Asia/Kuala_Lumpur')
+
 # Route to update a submission
 @app.route('/submit_edit/<int:submission_id>', methods=['POST'])
 def submit_edit(submission_id):
@@ -1028,13 +1055,9 @@ def submit_edit(submission_id):
     if old_submission.user_id != session.get('user_id'):
         abort(403)
 
-    # Find the original submission
-    if old_submission.original_id:
-        original_id = old_submission.original_id  # If it's an edit, get original id
-    else:
-        original_id = old_submission.id  # If original, use own id
+    # Determine original ID
+    original_id = old_submission.original_id if old_submission.original_id else old_submission.id
 
-    # Get current user id from session or db lookup
     user_id = session.get('user_id')
 
     # Handle file upload
@@ -1044,15 +1067,15 @@ def submit_edit(submission_id):
         filename = secure_filename(file.filename)
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-    # Create new submission as an edit
+    # Create the new (edited) submission
     new_submission = Submission(
         user_id=user_id,
         group_name=request.form.get('Group_Name'),
         title=request.form.get('Title'),
         description=request.form.get('Description'),
         filename=filename if filename else old_submission.filename,
-        timestamp=datetime.now(),  
-        is_late=False,  
+        timestamp=datetime.now(malaysia_time),
+        is_late=False,
         due_date=old_submission.due_date,
         form_id=old_submission.form_id,
         status='Pending',
@@ -1064,7 +1087,20 @@ def submit_edit(submission_id):
     db.session.add(new_submission)
     db.session.commit()
 
-    flash('Submission updated successfully.')
+    # Copy comments from original submission
+    old_comments = Comment.query.filter_by(submission_id=original_id).all()
+    for comment in old_comments:
+        copied_comment = Comment(
+            submission_id=new_submission.id,
+            user_id=comment.user_id,
+            text=f"[Comment from previous version]\n{comment.text}",
+            timestamp=datetime.now(malaysia_time)
+        )
+        db.session.add(copied_comment)
+
+    db.session.commit()
+
+    flash('Submission updated successfully with previous comments carried over.')
     return redirect(url_for('student_history'))
 
 # Route to delete a submission
@@ -1085,11 +1121,18 @@ def delete_submission(submission_id):
     else:
         original = submission
 
-    # Delete the original and all edits
+    # Find all edits and the original
     edits = Submission.query.filter_by(original_id=original.id).all()
-    for edit in edits:
-        db.session.delete(edit)
-    db.session.delete(original)
+    all_to_delete = edits + [original]
+
+    # Delete all comments linked to each submission/edit
+    for sub in all_to_delete:
+        for comment in sub.comments:
+            db.session.delete(comment)
+
+    # Now delete the submissions
+    for sub in all_to_delete:
+        db.session.delete(sub)
 
     db.session.commit()
 
