@@ -666,8 +666,6 @@ def StudentForm():
                          assignments=available_assignments,
                          enrolled_courses=enrolled_courses,
                          form=form)
-                         enrolled_courses=enrolled_courses,
-                         form=form)
 
 
 # Route to view student submission history
@@ -984,7 +982,6 @@ def submit_comment(submission_id):
         user_id=session['user_id'],
         text=comment_text,
         timestamp=datetime.now(malaysia_time)  
-        timestamp=datetime.now(malaysia_time)  
     )
     db.session.add(new_comment)
     db.session.commit()
@@ -1016,7 +1013,6 @@ def update_status_and_comment(submission_id):
             submission_id=submission.id,
             user_id=current_user.id,
             text=comment_text,
-            timestamp=datetime.now(malaysia_time)  
             timestamp=datetime.now(malaysia_time)  
         )
         db.session.add(comment)
