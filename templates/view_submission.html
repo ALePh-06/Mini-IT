@@ -6,7 +6,7 @@
       <h3 class="card-title">{{ submission.title }}</h3>
       <p><strong>Group:</strong> {{ submission.group_name }}</p>
       <p><strong>Description:</strong> {{ submission.description }}</p>
-      <p><strong>Submitted At:</strong> {{ submission.timestamp.strftime('%Y-%m-%d %H:%M') }}</p>
+      <p><strong>Submitted At:</strong> {{ submission.timestamp.strftime('%d %B %Y %H:%M:%S') }}</p>
 
 
       {% if submission.filename %}

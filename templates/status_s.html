@@ -7,9 +7,9 @@
     <div class="card mb-3">
       <div class="card-body">
         <a href="{{ url_for('view_submission', submission_id=submission['id']) }}">
-          <h5 class="card-title">{{ submission['title'] }}</h5>
+          <h5 class="card-title">{{ submission.title }}</h5>
         </a>
-        <span class="badge badge-primary">Status : {{ submission['status'] }}</span>
+        <span class="badge badge-primary">Status : {{ submission.status }}</span>
       </div>
     </div>
   {% endfor %}
