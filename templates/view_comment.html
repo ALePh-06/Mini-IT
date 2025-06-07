@@ -14,8 +14,10 @@
 <body>
     <div class="container">
         <h1>Submission Details</h1>
+        <p><strong>Group Name:</strong> {{ submission.group_name }}</p>
         <p><strong>Title:</strong> {{ submission.title }}</p>
-        <p><strong>Submitted At:</strong> {{ submission.timestamp }}</p>
+        <p><strong>Description:</strong> {{ submission.description }}</p>
+        <p><strong>Submitted At:</strong> {{ submission.timestamp.strftime('%d %B %Y %H:%M:%S') }}</p>
         <p class="status"><strong>Status:</strong> {{ submission.status }}</p>
 
         <hr>
@@ -23,7 +25,7 @@
         {% if comments %}
             {% for comment in comments %}
                 <div class="comment">
-                    <strong>{{ comment.user.username }}</strong> ({{ comment.timestamp.strftime('%Y-%m-%d %H:%M') }}):<br>
+                    <strong>{{ comment.user.username }}</strong> ({{ comment.timestamp.strftime('%d %B %Y %H:%M:%S') }}):<br>
                     {{ comment.text }}
                 </div>
             {% endfor %}

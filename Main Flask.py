@@ -301,7 +301,7 @@ def signup():
                 return redirect(url_for("signup"))
             
             # Save user to database
-            new_user = Users(username=username, password=hashed_password, user_type=user_type)
+            new_user = Users(username=username, password=hashed_password, user_type=user_type, email=email)
             db.session.add(new_user)
             db.session.commit()
 
@@ -678,11 +678,12 @@ def StudentForm():
         available_assignments = AssignedTemplate.query.filter(
             AssignedTemplate.course_id.in_(course_ids),).all()
     
+    form = AssignedTemplate.query.first()
     return render_template('StudentForm.html', 
                          assignments=available_assignments,
-                         enrolled_courses=enrolled_courses)
+                         enrolled_courses=enrolled_courses,
+                         form=form)
 
-from collections import defaultdict
 
 # Route to view student submission history
 @app.route('/Student/History')
@@ -918,7 +919,7 @@ def submit():
     form = None
     is_late = False  
 
-    now = malaysia_time()  # Timezone-aware
+    now = datetime.now(malaysia_time)  # Timezone-aware
     if form_id:
         try:
             form_id_int = int(form_id)
@@ -1000,7 +1001,7 @@ def submit_comment(submission_id):
         submission_id=submission_id,
         user_id=session['user_id'],
         text=comment_text,
-        timestamp=datetime.utcnow()
+        timestamp=datetime.now(malaysia_time)  
     )
     db.session.add(new_comment)
     db.session.commit()
@@ -1019,6 +1020,8 @@ def download(filename):
 def update_status_and_comment(submission_id):
     submission = Submission.query.get_or_404(submission_id)
 
+    malaysia_time = pytz.timezone('Asia/Kuala_Lumpur')
+
     if session.get("user_type") != "lecturer":
         abort(403)
 
@@ -1034,7 +1037,7 @@ def update_status_and_comment(submission_id):
             submission_id=submission.id,
             user_id=current_user.id,
             text=comment_text,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(malaysia_time)  
         )
         db.session.add(comment)
 
@@ -1043,6 +1046,8 @@ def update_status_and_comment(submission_id):
     flash("Submission status and comment updated.")
     return redirect(url_for("view_submission", submission_id=submission.id))
 
+malaysia_time = pytz.timezone('Asia/Kuala_Lumpur')
+
 # Route to update a submission
 @app.route('/submit_edit/<int:submission_id>', methods=['POST'])
 def submit_edit(submission_id):
@@ -1050,13 +1055,9 @@ def submit_edit(submission_id):
     if old_submission.user_id != session.get('user_id'):
         abort(403)
 
-    # Find the original submission
-    if old_submission.original_id:
-        original_id = old_submission.original_id  # If it's an edit, get original id
-    else:
-        original_id = old_submission.id  # If original, use own id
+    # Determine original ID
+    original_id = old_submission.original_id if old_submission.original_id else old_submission.id
 
-    # Get current user id from session or db lookup
     user_id = session.get('user_id')
 
     # Handle file upload
@@ -1066,15 +1067,15 @@ def submit_edit(submission_id):
         filename = secure_filename(file.filename)
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-    # Create new submission as an edit
+    # Create the new (edited) submission
     new_submission = Submission(
         user_id=user_id,
         group_name=request.form.get('Group_Name'),
         title=request.form.get('Title'),
         description=request.form.get('Description'),
         filename=filename if filename else old_submission.filename,
-        timestamp=datetime.now(),  
-        is_late=False,  
+        timestamp=datetime.now(malaysia_time),
+        is_late=False,
         due_date=old_submission.due_date,
         form_id=old_submission.form_id,
         status='Pending',
@@ -1086,7 +1087,20 @@ def submit_edit(submission_id):
     db.session.add(new_submission)
     db.session.commit()
 
-    flash('Submission updated successfully.')
+    # Copy comments from original submission
+    old_comments = Comment.query.filter_by(submission_id=original_id).all()
+    for comment in old_comments:
+        copied_comment = Comment(
+            submission_id=new_submission.id,
+            user_id=comment.user_id,
+            text=f"[Comment from previous version]\n{comment.text}",
+            timestamp=datetime.now(malaysia_time)
+        )
+        db.session.add(copied_comment)
+
+    db.session.commit()
+
+    flash('Submission updated successfully with previous comments carried over.')
     return redirect(url_for('student_history'))
 
 # Route to delete a submission
@@ -1124,7 +1138,6 @@ def delete_submission(submission_id):
 
     flash("Submission and all edits deleted successfully.", "info")
     return redirect(url_for('student_history'))
-
 
 
 
