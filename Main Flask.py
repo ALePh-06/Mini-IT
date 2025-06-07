@@ -302,7 +302,7 @@ def signup():
                 return redirect(url_for("signup"))
             
             # Save user to database
-            new_user = Users(username=username, email=email, password=hashed_password, user_type=user_type, email=email)
+            new_user = Users(username=username, email=email, password=hashed_password, user_type=user_type)
             db.session.add(new_user)
             db.session.commit()
 
@@ -352,7 +352,7 @@ def join_group(course_id):
         flash('You must be logged in as a student to join a group.')
         return redirect(url_for('login'))
 
-    user = Users.query.filter_by(username=session['username']).first()
+    user = get_current_user()
     if not user:
         flash('User not found.')
         return redirect(url_for('login'))
@@ -390,7 +390,7 @@ def join_group(course_id):
         flash(f"You have successfully joined group '{group.name}'.")
         return redirect(url_for('index'))
 
-    return render_template('JoinGroup.html')  # Create this template
+    return render_template('GroupJoining.html')  # Create this template
 
 @app.route("/Logout")
 def logout():
@@ -670,7 +670,6 @@ def StudentForm():
 
 # Route to view student submission history
 @app.route('/Student/History')
-@app.route('/Student/History')
 def student_history():
     if 'username' not in session:
         flash("Please log in to view your submission history.")
@@ -801,7 +800,6 @@ def history():
         submissions_dict[latest] = [previous] if previous else []
 
     return render_template('SubmissionHistory.html',
-                           submissions=submissions_dict,
                            submissions=submissions_dict,
                            group_names=group_names,
                            selected_group=selected_group)
@@ -1056,8 +1054,6 @@ def submit_edit(submission_id):
         title=request.form.get('Title'),
         description=request.form.get('Description'),
         filename=filename if filename else old_submission.filename,
-        timestamp=datetime.now(malaysia_time),
-        is_late=False,
         timestamp=datetime.now(malaysia_time),
         is_late=False,
         due_date=old_submission.due_date,
