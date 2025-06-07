@@ -648,11 +648,8 @@ def student_history():
         abort(403)
 
     # Get all submissions for this user
-    # Get all submissions for this user
     all_submissions = Submission.query.filter_by(user_id=user.id).order_by(Submission.timestamp.desc()).all()
 
-    # Build chains by original_id
-    chains = defaultdict(list)
     # Build chains by original_id
     chains = defaultdict(list)
     for s in all_submissions:
@@ -675,15 +672,6 @@ def student_history():
             else:
                 submissions_dict[previous] = []
 
-    for chain in chains.values():
-        sorted_chain = sorted(chain, key=lambda x: x.timestamp, reverse=True)
-        previous = sorted_chain[0]
-        latest = sorted_chain[1] if len(sorted_chain) > 1 else None
-        if previous:  # only include if there's a valid submission
-            if latest:
-                submissions_dict[latest] = [previous]
-            else:
-                submissions_dict[previous] = []
 
 
     return render_template("StudentHistory.html", submissions=submissions_dict)
@@ -753,19 +741,6 @@ def history():
         previous = sorted_chain[0]
         latest = sorted_chain[1] if len(sorted_chain) > 1 else None
         submissions_dict[latest] = [previous] if previous else []
-    # Build chains by original_id
-    chains = defaultdict(list)
-    for s in all_submissions:
-        key = s.original_id if s.original_id else s.id
-        chains[key].append(s)
-
-    # Keep only latest and one previous version
-    submissions_dict = {}
-    for chain in chains.values():
-        sorted_chain = sorted(chain, key=lambda x: x.timestamp, reverse=True)
-        previous = sorted_chain[0]
-        latest = sorted_chain[1] if len(sorted_chain) > 1 else None
-        submissions_dict[latest] = [previous] if previous else []
 
     return render_template('SubmissionHistory.html',
                            submissions=submissions_dict,
@@ -821,18 +796,6 @@ def status():
         latest_submissions = [sorted(subs, key=lambda x: x.timestamp, reverse=True)[0] for subs in chains.values()]
 
         return render_template("status_s.html", submissions=latest_submissions)
-        # Group by original submission ID or own ID
-        chains = defaultdict(list)
-        for s in all_submissions:
-            key = s.original_id if s.original_id else s.id
-            chains[key].append(s)
-
-        # Keep only the latest version of each chain
-        latest_submissions = [sorted(subs, key=lambda x: x.timestamp, reverse=True)[0] for subs in chains.values()]
-
-        return render_template("status_s.html", submissions=latest_submissions)
-
-
 
 #ALL CODE RELATED TO SUBMIT, DOWNLOAD, AND ETC!!!!!!!!!!!!!!!!!!!!!
 # Route to handle student form submission
