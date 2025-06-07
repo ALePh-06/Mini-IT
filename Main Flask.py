@@ -117,8 +117,10 @@ class SubmissionFieldAnswer(db.Model):
     __tablename__ = 'submission_field_answer'
     id = db.Column(db.Integer, primary_key=True)
     submission_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False)
-    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
+    field_id = db.Column(db.Integer, db.ForeignKey('template_fields.id'), nullable=False)  
     value = db.Column(db.String)
+    
+    field = db.relationship('TemplateField', backref='answers')
 
 #FormTemplate
 class FormTemplate(db.Model):
@@ -646,47 +648,45 @@ def student_history():
     if user.user_type != "student":
         abort(403)
 
-    # Get all submissions for this user
-    all_submissions = Submission.query.filter_by(user_id=user.id).order_by(Submission.timestamp.desc()).all()
+    group_id = session.get("user_id")
+    all_submissions = Submission.query.filter_by(group_id=group_id).order_by(Submission.date.desc()).all()
 
-    # Build chains by original_id
     chains = defaultdict(list)
     for s in all_submissions:
         key = s.original_id if s.original_id else s.id
         chains[key].append(s)
 
-    # Build display dictionary: latest as key, second-latest as dropdown
-        key = s.original_id if s.original_id else s.id
-        chains[key].append(s)
-
-    # Build display dictionary: latest as key, second-latest as dropdown
     submissions_dict = {}
     for chain in chains.values():
-        sorted_chain = sorted(chain, key=lambda x: x.timestamp, reverse=True)
-        previous = sorted_chain[0]
-        latest = sorted_chain[1] if len(sorted_chain) > 1 else None
-        if previous:  # only include if there's a valid submission
-            if latest:
-                submissions_dict[latest] = [previous]
-            else:
-                submissions_dict[previous] = []
+        sorted_chain = sorted(chain, key=lambda x: x.date, reverse=True)
+        latest = sorted_chain[0]
+        previous = sorted_chain[1] if len(sorted_chain) > 1 else None
 
+        # Fetch answers for each version
+        latest_answers = SubmissionFieldAnswer.query.filter_by(submission_id=latest.id).all()
+        previous_answers = SubmissionFieldAnswer.query.filter_by(submission_id=previous.id).all() if previous else []
 
+        if latest:
+            submissions_dict[latest] = {
+                'latest_answers': latest_answers,
+                'previous_answers': previous_answers
+            }
 
     return render_template("StudentHistory.html", submissions=submissions_dict)
-
 
 # LECTURER CODE!!!!!
 # Route to edit a submission
 @app.route('/edit_submission/<int:submission_id>', methods=['GET'])
 def edit_submission(submission_id):
     submission = Submission.query.get_or_404(submission_id)
-    
-    # Can add access control here: only allow the student who submitted it
-    if submission.user_id != session.get('user_id'):
+    group_id = session.get("user_id")
+
+    # Access control: check if user is owner or in same group
+    if submission.group_id != group_id:
         abort(403)
-    form = FormTemplate.query.first()  # Get the first form template, or modify to get a specific one if needed
-    return render_template('edit_submission.html', submission=submission, form=form)
+
+    form = FormTemplate.query.first()  # adjust as needed
+    return render_template('edit_template.html', submission=submission, form=form)
 
 # Route for submission history lecturer
 @app.route('/SubmissionHistory')
@@ -707,58 +707,66 @@ def history():
         flash("User not found.")
         return redirect(url_for('login'))
 
-    # Get all unique group names
-    group_names = db.session.query(Submission.group_name).distinct().order_by(Submission.group_name).all()
-    group_names = [g[0] for g in group_names if g[0]]
+    # Get all groups for the dropdown filter
+    groups = Group.query.order_by(Group.name).all()
 
-    selected_group = request.args.get('group_name')
+    # Get selected group_id from query string, convert to int or None
+    selected_group_id = request.args.get('group_id', type=int)
 
-    # Get all student user IDs
-    student_ids = [u.id for u in Users.query.filter_by(user_type='student').all()]
-
-    # Query all submissions made by students (optionally filtered by group)
-    if selected_group:
+    # Filter submissions by group_id if selected, else all
+    if selected_group_id:
         all_submissions = Submission.query.filter(
-            Submission.group_name == selected_group,
-            Submission.user_id.in_(student_ids)
-        ).order_by(Submission.timestamp.desc()).all()
+            Submission.group_id == selected_group_id
+        ).order_by(Submission.date.desc()).all()
     else:
-        all_submissions = Submission.query.filter(
-            Submission.user_id.in_(student_ids)
-        ).order_by(Submission.timestamp.desc()).all()
+        all_submissions = Submission.query.order_by(Submission.date.desc()).all()
 
-    # Build chains by original_id
+    # Group submissions into chains by original_id (or self id if original_id is None)
     chains = defaultdict(list)
     for s in all_submissions:
         key = s.original_id if s.original_id else s.id
         chains[key].append(s)
 
-    # Keep only latest and one previous version
+    # For each chain, keep the latest and one previous version (if exists)
     submissions_dict = {}
-    for chain in chains.values():
-        sorted_chain = sorted(chain, key=lambda x: x.timestamp, reverse=True)
-        previous = sorted_chain[0]
-        latest = sorted_chain[1] if len(sorted_chain) > 1 else None
+    for chain_submissions in chains.values():
+        sorted_chain = sorted(chain_submissions, key=lambda x: x.date, reverse=True)
+        latest = sorted_chain[0]
+        previous = sorted_chain[1] if len(sorted_chain) > 1 else None
         submissions_dict[latest] = [previous] if previous else []
 
-    return render_template('SubmissionHistory.html',
-                           submissions=submissions_dict,
-                           group_names=group_names,
-                           selected_group=selected_group)
-
+    return render_template(
+        'SubmissionHistory.html',
+        submissions=submissions_dict,
+        groups=groups,
+        selected_group_id=selected_group_id
+    )
 
 # Route to view a specific submission for lecturers 
 @app.route('/viewsubmission/<int:submission_id>')
 def view_submission(submission_id):
+    if 'user_type' not in session:
+        flash("Please log in first.")
+        return redirect(url_for('login'))
+
     submission = Submission.query.get_or_404(submission_id)
-    
+    answers = SubmissionFieldAnswer.query.filter_by(submission_id=submission_id).all()
+
+    # Preload form fields (assuming your field model is TemplateField)
+    field_ids = [a.field_id for a in answers]
+    fields = TemplateField.query.filter(TemplateField.id.in_(field_ids)).all()
+    fields_dict = {f.id: f for f in fields}
+
     comments = Comment.query.filter_by(submission_id=submission.id).order_by(Comment.timestamp.desc()).all()
 
-    if session['user_type'] == 'lecturer':
-        return render_template('view_submission.html', submission=submission, comments=comments)
-    else:
-        return render_template('view_comment.html', submission=submission, comments=comments)
+    user_type = session.get('user_type')
 
+    if user_type == 'lecturer':
+        return render_template('view_submission.html', submission=submission, comments=comments, fields=fields_dict, answers=answers)
+    elif user_type == 'student':
+        return render_template('view_comment.html', submission=submission, comments=comments, fields=fields_dict, answers=answers)
+    else:
+        abort(403)  # Forbidden for other user types
 
 #ALL CODE RELATED TO BOTH STUDENT AND LECTURER!!!!!!!!!!!!!!
 # Route for submission status
@@ -772,18 +780,14 @@ def status():
         course_ids = [course.id for course in courses]
 
         submissions = []
-        if course_ids:  # Only query if there are course IDs
-            submissions = Submission.query.filter(Submission.course_id.in_(course_ids)).all() # Get all submissions related to those courses (assuming submissions link to course/group with course_id)
+        if course_ids:
+            submissions = Submission.query.filter(Submission.course_id.in_(course_ids)).all()
         return render_template("status.html", submissions=submissions)
 
     else:
         # Get all submissions in the user's group
-        all_submissions = Submission.query.join(Users).filter(
-        # Get all submissions in the user's group
-        all_submissions = Submission.query.join(Users).filter(
-            Users.group_id == current_user.group_id
-        ).order_by(Submission.timestamp.desc()).all()
-        ).order_by(Submission.timestamp.desc()).all()
+        group_id = session.get("user_id")
+        all_submissions = Submission.query.filter_by(group_id=group_id).order_by(Submission.date.desc()).all()
 
         # Group by original submission ID or own ID
         chains = defaultdict(list)
@@ -792,9 +796,10 @@ def status():
             chains[key].append(s)
 
         # Keep only the latest version of each chain
-        latest_submissions = [sorted(subs, key=lambda x: x.timestamp, reverse=True)[0] for subs in chains.values()]
+        latest_submissions = [sorted(subs, key=lambda x: x.date, reverse=True)[0] for subs in chains.values()]
 
         return render_template("status_s.html", submissions=latest_submissions)
+
 
 #ALL CODE RELATED TO SUBMIT, DOWNLOAD, AND ETC!!!!!!!!!!!!!!!!!!!!!
 # Route to handle student form submission
@@ -826,7 +831,6 @@ def submit():
     form = None
     is_late = False  
 
-    now = datetime.now(malaysia_time)  # Timezone-aware
     now = datetime.now(malaysia_time)  # Timezone-aware
     if form_id:
         try:
@@ -924,8 +928,6 @@ def update_status_and_comment(submission_id):
 
     malaysia_time = pytz.timezone('Asia/Kuala_Lumpur')
 
-    malaysia_time = pytz.timezone('Asia/Kuala_Lumpur')
-
     if session.get("user_type") != "lecturer":
         abort(403)
 
@@ -952,8 +954,6 @@ def update_status_and_comment(submission_id):
 
 malaysia_time = pytz.timezone('Asia/Kuala_Lumpur')
 
-malaysia_time = pytz.timezone('Asia/Kuala_Lumpur')
-
 # Route to update a submission
 @app.route('/submit_edit/<int:submission_id>', methods=['POST'])
 def submit_edit(submission_id):
@@ -961,23 +961,15 @@ def submit_edit(submission_id):
     if old_submission.user_id != session.get('user_id'):
         abort(403)
 
-    # Determine original ID
     original_id = old_submission.original_id if old_submission.original_id else old_submission.id
-
-    # Determine original ID
-    original_id = old_submission.original_id if old_submission.original_id else old_submission.id
-
     user_id = session.get('user_id')
 
-    # Handle file upload
     file = request.files.get('Upload_file')
     filename = None
     if file and file.filename != '':
         filename = secure_filename(file.filename)
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-    # Create the new (edited) submission
-    # Create the new (edited) submission
     new_submission = Submission(
         user_id=user_id,
         group_name=request.form.get('Group_Name'),
@@ -997,7 +989,20 @@ def submit_edit(submission_id):
     db.session.add(new_submission)
     db.session.commit()
 
-    # Copy comments from original submission
+    # Copy field answers from form
+    old_field_answers = SubmissionFieldAnswer.query.filter_by(submission_id=submission_id).all()
+    for old_answer in old_field_answers:
+        field_key = f"field_{old_answer.field_id}"
+        new_value = request.form.get(field_key)
+        if new_value is not None:
+            new_answer = SubmissionFieldAnswer(
+                submission_id=new_submission.id,
+                field_id=old_answer.field_id,
+                value=new_value
+            )
+            db.session.add(new_answer)
+
+    # Copy old comments
     old_comments = Comment.query.filter_by(submission_id=original_id).all()
     for comment in old_comments:
         copied_comment = Comment(
@@ -1010,21 +1015,7 @@ def submit_edit(submission_id):
 
     db.session.commit()
 
-    flash('Submission updated successfully with previous comments carried over.')
-    # Copy comments from original submission
-    old_comments = Comment.query.filter_by(submission_id=original_id).all()
-    for comment in old_comments:
-        copied_comment = Comment(
-            submission_id=new_submission.id,
-            user_id=comment.user_id,
-            text=f"[Comment from previous version]\n{comment.text}",
-            timestamp=datetime.now(malaysia_time)
-        )
-        db.session.add(copied_comment)
-
-    db.session.commit()
-
-    flash('Submission updated successfully with previous comments carried over.')
+    flash('Submission updated successfully with previous comments and answers carried over.')
     return redirect(url_for('student_history'))
 
 # Route to delete a submission
@@ -1033,10 +1024,12 @@ def delete_submission(submission_id):
     if 'username' not in session:
         return redirect(url_for('login'))
 
+    
+    group_id = session.get("user_id")
     user = Users.query.filter_by(username=session['username']).first()
     submission = Submission.query.get_or_404(submission_id)
 
-    if submission.user_id != user.id:
+    if submission.group_id != group_id:
         abort(403)
 
     # Find the original submission
