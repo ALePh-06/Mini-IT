@@ -105,6 +105,7 @@ class Submission(db.Model):
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
     edited = db.Column(db.Boolean, default=False)  
     original_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=True) # Original submission ID for edits
+    value = db.relationship('SubmissionFieldAnswer', backref='submission', cascade="all, delete-orphan")
 
     edits = db.relationship(
         "Submission",
@@ -595,8 +596,7 @@ def fill_template(course_id):
         flash('Access denied: Only students can fill templates.')
         return redirect(url_for('index'))
 
-    group_id = session.get('user_id')
-
+    group_id = session.get("user_id")
     # Get assigned template for this course
     assignment = AssignedTemplate.query.filter_by(course_id=course_id).first()
     if not assignment:
@@ -622,7 +622,7 @@ def fill_template(course_id):
             field_answer = SubmissionFieldAnswer(
                 submission_id=submission.id,
                 field_id=field.id,
-                answer=answer
+                value=answer
             )
             db.session.add(field_answer)
 
