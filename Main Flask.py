@@ -889,7 +889,7 @@ def status():
 
 
 
-#ALL CODE RELATED TO SUBMIT, DOWNLOAD, AND ETC!!!!!!!!!!!!!!!!!!!!!
+#ALL CODE RELATED TO SUBMIT AND ETC!!!!!!!!!!!!!!!!!!!!!
 # Route to handle student form submission
 @app.route('/submit', methods=['POST'])
 def submit():
@@ -1008,12 +1008,6 @@ def submit_comment(submission_id):
 
     flash("Comment submitted successfully!")
     return redirect(url_for('review_submission', submission_id=submission_id))
-
-# Route to download files
-@app.route('/download/<filename>')
-def download(filename):
-    safe_filename = secure_filename(filename)
-    return send_from_directory(app.config['UPLOAD_FOLDER'], safe_filename, as_attachment=True)
 
 # Route for updating both status and adding comment
 @app.route("/update_status/<int:submission_id>", methods=["POST"])
