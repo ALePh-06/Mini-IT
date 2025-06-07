@@ -105,13 +105,20 @@ class Submission(db.Model):
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
     edited = db.Column(db.Boolean, default=False)  
     original_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=True) # Original submission ID for edits
-    value = db.relationship('SubmissionFieldAnswer', backref='submission', cascade="all, delete-orphan")
+    values = db.relationship('SubmissionFieldAnswer', backref='submission', cascade="all, delete-orphan")
 
     edits = db.relationship(
         "Submission",
         cascade="all, delete-orphan",
         backref=db.backref("original", remote_side=[id])
     )
+
+class SubmissionFieldAnswer(db.Model):
+    __tablename__ = 'submission_field_answer'
+    id = db.Column(db.Integer, primary_key=True)
+    submission_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False)
+    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
+    value = db.Column(db.String)
 
 #FormTemplate
 class FormTemplate(db.Model):
@@ -140,13 +147,6 @@ class FormField(db.Model):
     
 #Answer model to link submissions with form fields
 #For asnwer of course
-class SubmissionFieldAnswer(db.Model):
-    __tablename__ = 'submission_field_answer'
-    id = db.Column(db.Integer, primary_key=True)
-    submission_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False)
-    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
-    value = db.Column(db.String)
-
 #Submission template model
 class SubmissionTemplate(db.Model):
     __tablename__ = 'submission_templates'

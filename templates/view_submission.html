@@ -4,11 +4,12 @@
   <div class="card">
     <div class="card-body">
       <h3 class="card-title">{{ submission.title }}</h3>
-      <p><strong>Group:</strong> {{ submission.group_name }}</p>
-      <p><strong>Description:</strong> {{ submission.description }}</p>
-      <p><strong>Submitted At:</strong> {{ submission.timestamp.strftime('%d %B %Y %H:%M:%S') }}</p>
+      <p><strong>Group:</strong> {{ submission.group_id }}</p>
+      <p><strong>Submitted At:</strong> {{ submission.date.strftime('%d %B %Y %H:%M:%S') }}</p>
+      {% for value in values%}
+        <p><strong>{{submissionfieldanswer.value}}</strong></p>
 
-
+      {% endfor %}
       {% if submission.filename %}
         <a href="{{ url_for('static', filename='uploads/' ~ submission.filename) }}" class="btn btn-outline-primary mb-2" download>
           Download File
