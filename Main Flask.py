@@ -100,6 +100,7 @@ class Submission(db.Model):
     group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False)
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
     date = db.Column(db.DateTime, nullable=False, default=malaysia_time())
+    due_date = db.Column(db.DateTime)
     status = db.Column(db.String(50), default='Pending')
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
     edited = db.Column(db.Boolean, default=False)  
@@ -635,39 +636,6 @@ def fill_template(course_id):
 # Naufal Codes 
 # The code has been arranged to be more organized and readable.
 # ALL CODE RELATED TO STUDENT!!!!!!!!!!!!!!!!!!!!
-# Route to display student form
-@app.route('/StudentForm')
-def StudentForm():
-    # Get student's enrolled courses
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    
-    current_user = Users.query.filter_by(username=session['username']).first()
-    if current_user.user_type != 'student':
-        flash('Access denied.', 'danger')
-        return redirect(url_for('index'))
-    
-    # Get courses student is enrolled in
-    enrolled_courses = db.session.query(Course).join(StudentCourse).filter(
-        StudentCourse.student_id == current_user.id
-    ).all()
-    
-    # Get active assignments for enrolled courses
-    course_ids = [course.id for course in enrolled_courses]
-    available_assignments = []
-    
-    if course_ids:
-        available_assignments = AssignedTemplate.query.filter(
-            AssignedTemplate.course_id.in_(course_ids),).all()
-    
-    form = AssignedTemplate.query.first()
-    form = AssignedTemplate.query.first()
-    return render_template('StudentForm.html', 
-                         assignments=available_assignments,
-                         enrolled_courses=enrolled_courses,
-                         form=form)
-
-
 # Route to view student submission history
 @app.route('/Student/History')
 def student_history():
