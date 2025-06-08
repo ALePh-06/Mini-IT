@@ -1,35 +1,33 @@
 {% extends 'base.html' %}
-
 {% block content %}
     <h2>{% block title %} {{ course['title'] }} {% endblock %}</h2>
     <span class="badge badge-primary">Trimester : {{ course['trimester'] }}</span>
     <p>Course code : {{ course['code'] }}</p>
-
-    {% if assigned_templates %}
-        <div class="row">
-          <a href="{{ url_for('assign_template_to_course', course_id=course.id) }}">
-          Replace template
-          </a>
-        {% for assignment in assigned_templates %}
-            <div class="col-12 col-md-6 col-lg-4 mb-3">
-              <div class="card h-100">
-                <div class="card-body">
-                <h4 class="card-title h5 mb-2">{{ assignment.template.name }}</h4>
-                </div>
-            </div>
-            </div>
-        {% endfor %}
-        </div>
-    
+    <p>{{ course['content'] }}</p>
+{% if assigned_template %}
+  {% if assigned_template.due_date %}
+    <strong>Due Date:</strong> {{ assigned_template.due_date.strftime('%Y-%m-%d %H:%M') }}
   {% else %}
-    <div class="text-center text-muted py-4">
-      <p class="mb-2">No templates assigned yet.</p>
-      <a href="{{ url_for('assign_template_to_course', course_id=course.id) }}">
-        Assign your first template
-      </a>
-    </div>
+    <em>No due date set.</em>
   {% endif %}
-  <p>{{ course['content'] }}</p>
-</div>
-
+  <div class="col-12 col-md-6 col-lg-4 mb-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <h4 class="card-title h5 mb-2">{{ assigned_template.template.name }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="row">
+    <a href="{{ url_for('assign_template_to_course', course_id=course.id) }}">
+      Replace template
+    </a>
+  </div>
+{% else %}
+  <div class="text-center text-muted py-4">
+    <p class="mb-2">No template assigned yet.</p>
+    <a href="{{ url_for('assign_template_to_course', course_id=course.id) }}">
+      Assign your first template
+    </a>
+  </div>
+{% endif %}
 {% endblock %}

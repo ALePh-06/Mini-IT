@@ -12,6 +12,10 @@
       </option>
     {% endfor %}
   </select>
+  <div class="form-group">
+    <label for="due_date">Due Date (Reminder)</label>
+    <input type="datetime-local" name="due_date" class="form-control" value="{{ current_assignment.due_date if current_assignment and current_assignment.due_date }}">
+  </div>
   <button type="submit" name="action" value="assign" class="btn btn-primary mt-2">Assign / Replace</button>
 </form>
 

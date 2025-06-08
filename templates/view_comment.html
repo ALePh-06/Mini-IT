@@ -1,19 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>View Submission</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; }
-        .container { max-width: 800px; margin: auto; }
-        h1, h2 { color: #333; }
-        .comment { margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
-        .status { font-weight: bold; color: #007BFF; }
-        .field-answer { margin-bottom: 10px; }
-        .field-name { font-weight: bold; }
-    </style>
-</head>
-<body>
+{% extends 'base_s.html' %}
+
+{% block content %}
     <div class="container">
         <h1>Submission Details</h1>
         {% if answers %}
@@ -27,7 +14,7 @@
             <p>No answers submitted yet.</p>
         {% endif %}
         <p><strong>Submitted At:</strong> {{ submission.date.strftime('%d %B %Y %H:%M:%S') }}</p>
-        <p class="status"><strong>Status:</strong> {{ submission.status }}</p>
+        <span class="badge badge-primary">Status : {{ submission['status'] }}</span>
 
         <hr>
         <h2>Lecturer Comments</h2>
@@ -42,5 +29,4 @@
             <p>No comments from lecturer yet.</p>
         {% endif %}
     </div>
-</body>
-</html>
+{% endblock %}
