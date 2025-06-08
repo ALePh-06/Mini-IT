@@ -1,20 +1,22 @@
 {% extends 'base_s.html' %}
-
 {% block content %}
-  <h2>Edit Submission</h2>
-  <form action="{{ url_for('submit_edit', submission_id=submission.id) }}" method="POST" enctype="multipart/form-data">
+  <h2>Edit Submission: {{ template.name }}</h2>
+  <form method="POST" action="{{ url_for('submit_edit', submission_id=submission.id) }}">
     {% for field in fields %}
-      <div class="mb-3">
-        <label class="form-label">{{ field.field_name }}</label>
-
-        {% if field.field_type == 'textarea' %}
-          <textarea name="field_{{ field.id }}" class="form-control" rows="4">{{ answers.get(field.id, '') }}</textarea>
+      <div class="form-group">
+        <label>{{ field.field_name }}</label>
+        {% if field.field_type|lower == 'textarea' %}
+          <textarea name="field_{{ field.id }}" class="form-control">{{ answers.get(field.id, '') }}</textarea>
         {% else %}
-          <input type="{{ field.field_type or 'text' }}" name="field_{{ field.id }}" class="form-control" value="{{ answers.get(field.id, '') }}">
+          <input
+            type="{{ field.field_type|lower }}"
+            name="field_{{ field.id }}"
+            class="form-control"
+            value="{{ answers.get(field.id, '') }}"
+          >
         {% endif %}
       </div>
     {% endfor %}
-
     <button type="submit" class="btn btn-primary">Submit Edit</button>
   </form>
 {% endblock %}
