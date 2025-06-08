@@ -42,6 +42,10 @@
                     <div class="input-A">
                         <input type="submit" id="SignupButton" value="Sign Up">
                     </div>
+
+                    {% for message in get_flashed_messages() %}
+                        <div class="mt-2 text-danger" style="font-size: 0.85rem;">{{ message }}</div>
+                    {% endfor %}
                 </form>
 
                 <div class="links">

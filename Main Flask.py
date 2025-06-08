@@ -11,6 +11,8 @@ from pytz import timezone
 from datetime import datetime
 from collections import defaultdict
 from sqlalchemy import or_
+from itsdangerous import URLSafeTimedSerializer
+
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'mydatabase.db')
 
@@ -39,9 +41,23 @@ db = SQLAlchemy(app)
 def malaysia_time():
     return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
 
+# Token utilities
+serializer = URLSafeTimedSerializer(app.secret_key)
+
+def generate_token(email):
+    return serializer.dumps(email, salt='password-reset-salt')
+
+def verify_token(token, expiration=3600):
+    try:
+        email = serializer.loads(token, salt='password-reset-salt', max_age=expiration)
+    except:
+        return None
+    return email
+
+
 class Users(db.Model):
     __tablename__ = 'users'
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    email = db.Column(db.String(150), unique=True, nullable=False)
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String, unique=True, nullable=False, index=True)
     password = db.Column(db.String, nullable=False)
@@ -311,6 +327,41 @@ def signup():
 
     return render_template("Signup.html") # This is the render template!!!!!!!!!!!!!!!!!!!!#
 
+# Forgot Password Route
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form['email']
+        user = Users.query.filter_by(email=email).first()
+        if user:
+            token = generate_token(email)
+            reset_url = url_for('reset_password', token=token, _external=True)
+            print(f"[DEBUG] Password reset link: {reset_url}")  # Replace with email logic
+            flash('Reset link sent to your email. (Simulated in console for now)')
+        else:
+            flash('Email not found.')
+    return render_template('templates/forgot_password.html')
+
+# Reset Password Route
+@app.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    email = verify_token(token)
+    if not email:
+        flash('Reset link is invalid or has expired.')
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        new_password = request.form['password']
+        hashed_pw = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+        user = Users.query.filter_by(email=email).first()
+        user.password = hashed_pw
+        db.session.commit()
+        flash('Password reset successful. You can now log in.')
+        return redirect(url_for('login'))
+
+    return render_template('templates/reset_password.html')
+
+
 # Join course via code function
 @app.route('/JoinCourse', methods=['GET', 'POST'])
 def JoinCourse():
@@ -330,7 +381,8 @@ def JoinCourse():
         # Check if already joined
         existing = StudentCourse.query.filter_by(student_id=student_id, course_id=course.id).first()
         if existing:
-            flash('You have already joined this course.')
+            flash('You have already enrolled in this course.')
+            
             return redirect(url_for('JoinCourse'))
 
         # Join course
@@ -338,7 +390,7 @@ def JoinCourse():
         db.session.add(join)
         db.session.commit()
         flash(f"You've successfully joined {course.title}.")
-        return redirect(url_for('index'))
+        return redirect(url_for('join_group'), course_id=course.id)
 
     return render_template('JoinCourse.html')
 
