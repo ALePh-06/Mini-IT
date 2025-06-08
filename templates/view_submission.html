@@ -4,10 +4,12 @@
   <div class="card">
     <div class="card-body">
       <h3 class="card-title">{{ submission.title }}</h3>
-      <p><strong>Group:</strong> {{ submission.group_name }}</p>
-      <p><strong>Description:</strong> {{ submission.description }}</p>
-      <p><strong>Submitted At:</strong> {{ submission.timestamp.strftime('%d %B %Y %H:%M:%S') }}</p>
 
+      {% for answer in answers %}
+        <p><strong>{{ fields[answer.field_id].field_name }}:</strong> {{ answer.value }}</p>
+      {% endfor %}
+
+      <p><strong>Submitted At:</strong> {{ submission.date.strftime('%d %B %Y %H:%M:%S') }}</p>
 
       {% if submission.filename %}
         <a href="{{ url_for('static', filename='uploads/' ~ submission.filename) }}" class="btn btn-outline-primary mb-2" download>
@@ -16,15 +18,12 @@
       {% endif %}
 
       <form method="POST" action="{{ url_for('update_status_and_comment', submission_id=submission.id) }}">
-        <!-- Hidden input to store status -->
         <input type="hidden" name="status" id="statusInput" value="{{ submission.status }}">
 
-        <!-- Status cycling button -->
         <button type="button" class="btn btn-info mb-2" id="statusButton" style="min-width: 120px;">
           {{ submission.status or "Pending" }}
         </button>
 
-        <!-- Comment textarea -->
         <div class="form-group mt-3">
           <label for="comment">Add Comment:</label>
           <textarea class="form-control" name="comment" rows="4" placeholder="Write feedback here..."></textarea>
@@ -35,7 +34,6 @@
     </div>
   </div>
 
-  <!-- JavaScript to handle cycling through statuses -->
   <script>
     document.addEventListener("DOMContentLoaded", function() {
       const button = document.getElementById("statusButton");

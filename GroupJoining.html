@@ -1,26 +1,22 @@
-<!DOCTYPE html>
-
-{% extends 'course_s.html' %}
+{% extends 'base_s.html' %}
 
 {% block content %}
-    {{ super() }}
+  <h3>Join a Group for {{ course.title }}</h3>
+  <form method="POST">
+      <div class="form-group">
+          <label for="group_code">Enter your group name:</label>
+          <input type="text" class="form-control" name="group_code" placeholder="e.g. {{ course.code }}-01" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Join Group</button>
+  </form>
 
-    <hr>
-    <h3>Join Group for This Course</h3>
+  {% if group %}
+    <div class="alert alert-info mt-3">
+      Group "{{ group.name }}" selected.
+    </div>
+  {% endif %}
 
-    {% if already_in_group %}
-        <div class="alert alert-info">
-            You are already in group <strong>{{ current_group }}</strong>.
-        </div>
-    {% else %}
-        <form method="POST" action="{{ url_for('join_group', course_id=course.id) }}">
-            <button type="submit" class="btn btn-primary">Join Group</button>
-        </form>
-    {% endif %}
-
-    {% if group_joined %}
-        <div class="alert alert-success mt-3">
-            Successfully joined group <strong>{{ current_group }}</strong>!
-        </div>
-    {% endif %}
+  {% for message in get_flashed_messages() %}
+    <div class="alert alert-danger mt-3">{{ message }}</div>
+  {% endfor %}
 {% endblock %}

@@ -101,17 +101,27 @@ class Submission(db.Model):
     group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False)
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
     date = db.Column(db.DateTime, nullable=False, default=malaysia_time())
+    due_date = db.Column(db.DateTime)
     status = db.Column(db.String(50), default='Pending')
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
     edited = db.Column(db.Boolean, default=False)  
     original_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=True) # Original submission ID for edits
-
+    values = db.relationship('SubmissionFieldAnswer', backref='submission', cascade="all, delete-orphan")
 
     edits = db.relationship(
         "Submission",
         cascade="all, delete-orphan",
         backref=db.backref("original", remote_side=[id])
     )
+
+class SubmissionFieldAnswer(db.Model):
+    __tablename__ = 'submission_field_answer'
+    id = db.Column(db.Integer, primary_key=True)
+    submission_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False)
+    field_id = db.Column(db.Integer, db.ForeignKey('template_fields.id'), nullable=False)  
+    value = db.Column(db.String)
+    
+    field = db.relationship('TemplateField', backref='answers')
 
 #FormTemplate
 class FormTemplate(db.Model):
@@ -140,13 +150,6 @@ class FormField(db.Model):
     
 #Answer model to link submissions with form fields
 #For asnwer of course
-class SubmissionFieldAnswer(db.Model):
-    __tablename__ = 'submission_field_answer'
-    id = db.Column(db.Integer, primary_key=True)
-    submission_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=False)
-    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)  
-    value = db.Column(db.String)
-
 #Submission template model
 class SubmissionTemplate(db.Model):
     __tablename__ = 'submission_templates'
@@ -350,51 +353,33 @@ def JoinCourse():
 
     return render_template('JoinCourse.html')
 
-@app.route('/course/<int:course_id>/JoinGroup', methods=['GET', 'POST'])
+# Show group join form
+@app.route('/course/<int:course_id>/join_group', methods=['GET', 'POST'])
 def join_group(course_id):
-    if 'user_type' not in session or session['user_type'] != 'student':
-        flash('You must be logged in as a student to join a group.')
+    if 'username' not in session:
+        flash("Login required.")
         return redirect(url_for('login'))
 
-    user = get_current_user()
-    if not user:
-        flash('User not found.')
-        return redirect(url_for('login'))
+    course = Course.query.get_or_404(course_id)
+    user = Users.query.filter_by(username=session['username']).first()
 
     if request.method == 'POST':
-        group_name = request.form['group_name'].strip()
+        group_code = request.form.get('group_code')
 
-        group = Group.query.filter_by(name=group_name).first()
+        # Check if group exists in this course
+        group = Group.query.filter_by(name=group_code, course_id=course.id).first()
         if not group:
-            flash('Group not found. Please check the group name.')
-            return redirect(url_for('join_group'))
+            flash("Invalid group name.")
+            return render_template('GroupJoining.html', course=course)
 
-        # Check if already in a group for this course
-        course_id = group.course_id
-        joined_group_ids = db.session.query(Group.id).join(GroupMembers).filter(
-            Group.course_id == course_id,
-            GroupMembers.user_id == user.id
-        ).all()
-
-        if joined_group_ids:
-            flash('You have already joined a group for this course.')
-            return redirect(url_for('join_group'))
-
-        # Check group member count
-        member_count = GroupMembers.query.filter_by(group_id=group.id).count()
-        if member_count >= 4:
-            flash('Group is full (max 4 members).')
-            return redirect(url_for('join_group'))
-
-        # Join the group
-        membership = GroupMembers(group_id=group.id, user_id=user.id)
-        db.session.add(membership)
+        # Associate user with group (1:1 relationship assumed)
+        user.group_id = group.id
         db.session.commit()
 
-        flash(f"You have successfully joined group '{group.name}'.")
-        return redirect(url_for('index'))
+        flash(f"Joined group {group.name}!")
+        return redirect(url_for('form_fill_page', course_id=course.id))  # Replace with your form filling page
 
-    return render_template('GroupJoining.html')  # Create this template
+    return render_template('GroupJoining.html', course=course)
 
 @app.route("/Logout")
 def logout():
@@ -415,7 +400,7 @@ def index():
         return render_template('Index_s.html', courses=courses)
     
 
-@app.route('/course/<int:course_id>')
+@app.route('/course/<int:course_id>', methods=['GET', 'POST'])
 def view_course(course_id):
     course = get_course(course_id)
     assigned_templates = AssignedTemplate.query.filter_by(course_id=course_id).all()
@@ -423,7 +408,7 @@ def view_course(course_id):
     if session['user_type'] == 'lecturer':
         return render_template('view_course.html', course=course, assigned_templates=assigned_templates)  # Create this template
     else:
-        return render_template('view_course_s.html', course=course, assigned_templates=assigned_templates)
+            return render_template('view_course_s.html', course=course, assigned_templates=assigned_templates)
 
 @app.route('/create_course', methods=('GET', 'POST'))
 def create_course():
@@ -598,8 +583,7 @@ def fill_template(course_id):
         flash('Access denied: Only students can fill templates.')
         return redirect(url_for('index'))
 
-    group_id = get_student_group_id(course_id=course_id)
-
+    group_id = session.get("user_id")
     # Get assigned template for this course
     assignment = AssignedTemplate.query.filter_by(course_id=course_id).first()
     if not assignment:
@@ -615,7 +599,6 @@ def fill_template(course_id):
             group_id=group_id,
             template_id=template.id,
             course_id=course_id,
-            date = malaysia_time()
         )
         db.session.add(submission)
         db.session.commit()
@@ -626,7 +609,7 @@ def fill_template(course_id):
             field_answer = SubmissionFieldAnswer(
                 submission_id=submission.id,
                 field_id=field.id,
-                answer=answer
+                value=answer
             )
             db.session.add(field_answer)
 
@@ -639,38 +622,6 @@ def fill_template(course_id):
 # Naufal Codes 
 # The code has been arranged to be more organized and readable.
 # ALL CODE RELATED TO STUDENT!!!!!!!!!!!!!!!!!!!!
-# Route to display student form
-@app.route('/StudentForm')
-def StudentForm():
-    # Get student's enrolled courses
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    
-    current_user = Users.query.filter_by(username=session['username']).first()
-    if current_user.user_type != 'student':
-        flash('Access denied.', 'danger')
-        return redirect(url_for('index'))
-    
-    # Get courses student is enrolled in
-    enrolled_courses = db.session.query(Course).join(StudentCourse).filter(
-        StudentCourse.student_id == current_user.id
-    ).all()
-    
-    # Get active assignments for enrolled courses
-    course_ids = [course.id for course in enrolled_courses]
-    available_assignments = []
-    
-    if course_ids:
-        available_assignments = AssignedTemplate.query.filter(
-            AssignedTemplate.course_id.in_(course_ids),).all()
-    
-    form = AssignedTemplate.query.first()
-    return render_template('StudentForm.html', 
-                         assignments=available_assignments,
-                         enrolled_courses=enrolled_courses,
-                         form=form)
-
-
 # Route to view student submission history
 @app.route('/Student/History')
 def student_history():
@@ -682,41 +633,46 @@ def student_history():
     if user.user_type != "student":
         abort(403)
 
-    # Get all submissions for this user
-    all_submissions = Submission.query.filter_by(user_id=user.id).order_by(Submission.timestamp.desc()).all()
+    group_id = session.get("user_id")
+    all_submissions = Submission.query.filter_by(group_id=group_id).order_by(Submission.date.desc()).all()
 
-    # Build chains by original_id
     chains = defaultdict(list)
     for s in all_submissions:
         key = s.original_id if s.original_id else s.id
         chains[key].append(s)
 
-    # Build display dictionary: latest as key, second-latest as dropdown
     submissions_dict = {}
     for chain in chains.values():
-        sorted_chain = sorted(chain, key=lambda x: x.timestamp, reverse=True)
-        previous = sorted_chain[0]
-        latest = sorted_chain[1] if len(sorted_chain) > 1 else None
-        if previous:  # only include if there's a valid submission
-            if latest:
-                submissions_dict[latest] = [previous]
-            else:
-                submissions_dict[previous] = []
+        sorted_chain = sorted(chain, key=lambda x: x.date, reverse=True)
+        latest = sorted_chain[0]
+        previous = sorted_chain[1] if len(sorted_chain) > 1 else None
 
+        # Fetch answers for each version
+        latest_answers = SubmissionFieldAnswer.query.filter_by(submission_id=latest.id).all()
+        previous_answers = SubmissionFieldAnswer.query.filter_by(submission_id=previous.id).all() if previous else []
+
+        if latest:
+            submissions_dict[latest] = {
+                'latest_answers': latest_answers,
+                'previous_answers': previous_answers
+            }
 
     return render_template("StudentHistory.html", submissions=submissions_dict)
+
 
 
 # Route to edit a submission
 @app.route('/edit_submission/<int:submission_id>', methods=['GET'])
 def edit_submission(submission_id):
     submission = Submission.query.get_or_404(submission_id)
-    
-    # Can add access control here: only allow the student who submitted it
-    if submission.user_id != session.get('user_id'):
+    group_id = session.get("user_id")
+
+    # Access control: check if user is owner or in same group
+    if submission.group_id != group_id:
         abort(403)
-    form = FormTemplate.query.first()  # Get the first form template, or modify to get a specific one if needed
-    return render_template('edit_submission.html', submission=submission, form=form)
+
+    form = FormTemplate.query.first()  # adjust as needed
+    return render_template('edit_template.html', submission=submission, form=form)
 
 
 # ALL CODE RELATED TO LECTURER!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -787,59 +743,66 @@ def history():
         flash("User not found.")
         return redirect(url_for('login'))
 
-    # Get all unique group names
-    group_names = db.session.query(Submission.group_name).distinct().order_by(Submission.group_name).all()
-    group_names = [g[0] for g in group_names if g[0]]
+    # Get all groups for the dropdown filter
+    groups = Group.query.order_by(Group.name).all()
 
-    selected_group = request.args.get('group_name')
+    # Get selected group_id from query string, convert to int or None
+    selected_group_id = request.args.get('group_id', type=int)
 
-    # Get all student user IDs
-    student_ids = [u.id for u in Users.query.filter_by(user_type='student').all()]
-
-    # Query all submissions made by students (optionally filtered by group)
-    if selected_group:
+    # Filter submissions by group_id if selected, else all
+    if selected_group_id:
         all_submissions = Submission.query.filter(
-            Submission.group_name == selected_group,
-            Submission.user_id.in_(student_ids)
-        ).order_by(Submission.timestamp.desc()).all()
+            Submission.group_id == selected_group_id
+        ).order_by(Submission.date.desc()).all()
     else:
-        all_submissions = Submission.query.filter(
-            Submission.user_id.in_(student_ids)
-        ).order_by(Submission.timestamp.desc()).all()
+        all_submissions = Submission.query.order_by(Submission.date.desc()).all()
 
-    # Build chains by original_id
+    # Group submissions into chains by original_id (or self id if original_id is None)
     chains = defaultdict(list)
     for s in all_submissions:
         key = s.original_id if s.original_id else s.id
         chains[key].append(s)
 
-
-    # Keep only latest and one previous version
+    # For each chain, keep the latest and one previous version (if exists)
     submissions_dict = {}
-    for chain in chains.values():
-        sorted_chain = sorted(chain, key=lambda x: x.timestamp, reverse=True)
-        previous = sorted_chain[0]
-        latest = sorted_chain[1] if len(sorted_chain) > 1 else None
+    for chain_submissions in chains.values():
+        sorted_chain = sorted(chain_submissions, key=lambda x: x.date, reverse=True)
+        latest = sorted_chain[0]
+        previous = sorted_chain[1] if len(sorted_chain) > 1 else None
         submissions_dict[latest] = [previous] if previous else []
 
-    return render_template('SubmissionHistory.html',
-                           submissions=submissions_dict,
-                           group_names=group_names,
-                           selected_group=selected_group)
-
+    return render_template(
+        'SubmissionHistory.html',
+        submissions=submissions_dict,
+        groups=groups,
+        selected_group_id=selected_group_id
+    )
 
 # Route to view a specific submission for lecturers 
 @app.route('/viewsubmission/<int:submission_id>')
 def view_submission(submission_id):
+    if 'user_type' not in session:
+        flash("Please log in first.")
+        return redirect(url_for('login'))
+
     submission = Submission.query.get_or_404(submission_id)
-    
+    answers = SubmissionFieldAnswer.query.filter_by(submission_id=submission_id).all()
+
+    # Preload form fields (assuming your field model is TemplateField)
+    field_ids = [a.field_id for a in answers]
+    fields = TemplateField.query.filter(TemplateField.id.in_(field_ids)).all()
+    fields_dict = {f.id: f for f in fields}
+
     comments = Comment.query.filter_by(submission_id=submission.id).order_by(Comment.timestamp.desc()).all()
 
-    if session['user_type'] == 'lecturer':
-        return render_template('view_submission.html', submission=submission, comments=comments)
-    else:
-        return render_template('view_comment.html', submission=submission, comments=comments)
+    user_type = session.get('user_type')
 
+    if user_type == 'lecturer':
+        return render_template('view_submission.html', submission=submission, comments=comments, fields=fields_dict, answers=answers)
+    elif user_type == 'student':
+        return render_template('view_comment.html', submission=submission, comments=comments, fields=fields_dict, answers=answers)
+    else:
+        abort(403)  # Forbidden for other user types
 
 #ALL CODE RELATED TO BOTH STUDENT AND LECTURER!!!!!!!!!!!!!!
 # Route for submission status
@@ -853,16 +816,25 @@ def status():
         course_ids = [course.id for course in courses]
 
         submissions = []
-        if course_ids:  # Only query if there are course IDs
-            submissions = Submission.query.filter(Submission.course_id.in_(course_ids)).all() # Get all submissions related to those courses (assuming submissions link to course/group with course_id)
+        if course_ids:
+            submissions = Submission.query.filter(Submission.course_id.in_(course_ids)).all()
         return render_template("status.html", submissions=submissions)
 
     else:
         # Get all submissions in the user's group
-        all_submissions = Submission.query.join(Users).filter(
-            Users.group_id == current_user.group_id
-        ).order_by(Submission.timestamp.desc()).all()
+        group_id = session.get("user_id")
+        all_submissions = Submission.query.filter_by(group_id=group_id).order_by(Submission.date.desc()).all()
 
+        # Group by original submission ID or own ID
+        chains = defaultdict(list)
+        for s in all_submissions:
+            key = s.original_id if s.original_id else s.id
+            chains[key].append(s)
+
+        # Keep only the latest version of each chain
+        latest_submissions = [sorted(subs, key=lambda x: x.date, reverse=True)[0] for subs in chains.values()]
+
+        return render_template("status_s.html", submissions=latest_submissions)
         # Group by original submission ID or own ID
         chains = defaultdict(list)
         for s in all_submissions:
@@ -1036,18 +1008,16 @@ def submit_edit(submission_id):
     if old_submission.user_id != session.get('user_id'):
         abort(403)
 
-    # Determine original ID
     original_id = old_submission.original_id if old_submission.original_id else old_submission.id
-
     user_id = session.get('user_id')
 
-    # Handle file upload
     file = request.files.get('Upload_file')
     filename = None
     if file and file.filename != '':
         filename = secure_filename(file.filename)
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
+    # Create the new (edited) submission
     # Create the new (edited) submission
     new_submission = Submission(
         user_id=user_id,
@@ -1068,7 +1038,20 @@ def submit_edit(submission_id):
     db.session.add(new_submission)
     db.session.commit()
 
-    # Copy comments from original submission
+    # Copy field answers from form
+    old_field_answers = SubmissionFieldAnswer.query.filter_by(submission_id=submission_id).all()
+    for old_answer in old_field_answers:
+        field_key = f"field_{old_answer.field_id}"
+        new_value = request.form.get(field_key)
+        if new_value is not None:
+            new_answer = SubmissionFieldAnswer(
+                submission_id=new_submission.id,
+                field_id=old_answer.field_id,
+                value=new_value
+            )
+            db.session.add(new_answer)
+
+    # Copy old comments
     old_comments = Comment.query.filter_by(submission_id=original_id).all()
     for comment in old_comments:
         copied_comment = Comment(
@@ -1081,7 +1064,7 @@ def submit_edit(submission_id):
 
     db.session.commit()
 
-    flash('Submission updated successfully with previous comments carried over.')
+    flash('Submission updated successfully with previous comments and answers carried over.')
     return redirect(url_for('student_history'))
 
 # Route to delete a submission
@@ -1090,10 +1073,12 @@ def delete_submission(submission_id):
     if 'username' not in session:
         return redirect(url_for('login'))
 
+    
+    group_id = session.get("user_id")
     user = Users.query.filter_by(username=session['username']).first()
     submission = Submission.query.get_or_404(submission_id)
 
-    if submission.user_id != user.id:
+    if submission.group_id != group_id:
         abort(403)
 
     # Find the original submission
