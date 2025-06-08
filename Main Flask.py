@@ -868,7 +868,7 @@ def submit_edit(submission_id):
     # Maintain chain to original
     original_id = old_submission.original_id if old_submission.original_id else old_submission.id
 
-    # ✅ Step 1: Create minimal submission entry to tie answers
+    
     new_submission = Submission(
         edited=True,
         original_id=original_id,
@@ -878,7 +878,7 @@ def submit_edit(submission_id):
     db.session.add(new_submission)
     db.session.commit()  # Must commit to generate new_submission.id
 
-    # ✅ Step 2: Dynamically get all fields and tie values to submission
+    
     fields = TemplateField.query.filter_by(template_id=old_submission.template_id).all()
     for field in fields:
         form_key = f"field_{field.id}"
@@ -890,7 +890,7 @@ def submit_edit(submission_id):
                 value=value
             ))
 
-    # ✅ Step 3: Copy old comments
+    
     old_comments = Comment.query.filter_by(submission_id=original_id).all()
     for comment in old_comments:
         db.session.add(Comment(
