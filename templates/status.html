@@ -3,24 +3,14 @@
 {% block content %}
   <h2>Submissions</h2>
 
-  {% if submissions %}
-    {% for submission in submissions %}
-      <div class="card mb-3">
-        <div class="card-body">
-          <a href="{{ url_for('view_submission', submission_id=submission.id) }}" class="text-decoration-none">
-            <h5 class="card-title mb-2">
-              {% if submission.template and submission.template.name %}
-                {{ submission.template.name }}
-              {% else %}
-                Submission #{{ loop.index }}
-              {% endif %}
-            </h5>
-          </a>
-          <span class="badge bg-primary">Status: {{ submission.status or "Pending" }}</span>
-        </div>
+  {% for submission in submissions %}
+    <div class="card mb-3">
+      <div class="card-body">
+        <a href="{{ url_for('view_submission', submission_id=submission['id']) }}">
+          <h5 class="card-title">{{ submission.group_id }}</h5>
+        </a>
+        <span class="badge badge-primary">Status: {{ submission.status }}</span>
       </div>
-    {% endfor %}
-  {% else %}
-    <p>No submissions found.</p>
-  {% endif %}
+    </div>
+  {% endfor %}
 {% endblock %}
