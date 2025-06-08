@@ -16,6 +16,8 @@
             <a href="{{ url_for('fill_template', course_id = course.id) }}" class="btn btn-sm btn-success">Fill</a>
         </li>
     {% else %}
-        <p>No templates assigned yet.</p>
+    <div class="card mb-3" style="background-color:rgb(238, 238, 238); color: #333;">
+        <div class="card-body">
+            <p>No templates assigned yet.</p>
     {% endif %}
 {% endblock %}

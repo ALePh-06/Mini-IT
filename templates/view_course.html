@@ -4,12 +4,14 @@
     <span class="badge badge-primary">Trimester : {{ course['trimester'] }}</span>
     <p>Course code : {{ course['code'] }}</p>
     <p>{{ course['content'] }}</p>
+
 {% if assigned_template %}
   {% if assigned_template.due_date %}
     <strong>Due Date:</strong> {{ assigned_template.due_date.strftime('%Y-%m-%d %H:%M') }}
   {% else %}
     <em>No due date set.</em>
   {% endif %}
+
   <div class="col-12 col-md-6 col-lg-4 mb-3">
     <div class="card h-100">
       <div class="card-body">
@@ -30,4 +32,5 @@
     </a>
   </div>
 {% endif %}
+
 {% endblock %}
