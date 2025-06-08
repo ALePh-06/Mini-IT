@@ -85,6 +85,7 @@ class AssignedTemplate(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
+    due_date = db.Column(db.DateTime)
 
     # Relationships
     course = db.relationship('Course', backref='assigned_templates', lazy='joined')
@@ -407,12 +408,12 @@ def index():
 @app.route('/course/<int:course_id>')
 def view_course(course_id):
     course = get_course(course_id)
-    assigned_templates = AssignedTemplate.query.filter_by(course_id=course_id).all()
+    assigned_template = AssignedTemplate.query.filter_by(course_id=course_id).first()
 
     if session['user_type'] == 'lecturer':
-        return render_template('view_course.html', course=course, assigned_templates=assigned_templates)  # Create this template
+        return render_template('view_course.html', course=course, assigned_template=assigned_template)  # Create this template
     else:
-        return render_template('view_course_s.html', course=course, assigned_templates=assigned_templates)
+        return render_template('view_course_s.html', course=course, assigned_template=assigned_template)
 
 @app.route('/create_course', methods=('GET', 'POST'))
 def create_course():
@@ -512,6 +513,14 @@ def assign_template_to_course(course_id):
         
         # Assign new or replace
         template_id = request.form.get('template_id')
+        due_date_str = request.form.get('due_date')
+        due_date = None
+        if due_date_str:
+            try:
+                due_date = datetime.strptime(due_date_str, '%Y-%m-%dT%H:%M')
+            except ValueError:
+                flash('Invalid date format.', 'danger')
+                return redirect(request.url)
         if not template_id:
             flash('Please select a template.', 'warning')
             return redirect(request.url)
@@ -519,7 +528,7 @@ def assign_template_to_course(course_id):
         if current_assignment:
             current_assignment.template_id = template_id  # Replace existing
         else:
-            new_assignment = AssignedTemplate(course_id=course_id, template_id=template_id)
+            new_assignment = AssignedTemplate(course_id=course_id, template_id=template_id, due_date=due_date if due_date else None)
             db.session.add(new_assignment)
 
         db.session.commit()
