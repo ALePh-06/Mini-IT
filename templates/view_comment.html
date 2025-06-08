@@ -1,32 +1,40 @@
-{% extends 'base_s.html' %}
+{% extends "base_s.html" %}
+
+{% block title %}View Submission{% endblock %}
 
 {% block content %}
-    <div class="container">
-        <h1>Submission Details</h1>
-        {% if answers %}
-            {% for answer in answers %}
-                <div class="field-answer">
-                    <span class="field-name">{{ fields[answer.field_id].field_name if fields.get(answer.field_id) else "Unknown Field" }}:</span>
-                    <span class="field-value">{{ answer.value }}</span>
-                </div>
-            {% endfor %}
-        {% else %}
-            <p>No answers submitted yet.</p>
-        {% endif %}
-        <p><strong>Submitted At:</strong> {{ submission.date.strftime('%d %B %Y %H:%M:%S') }}</p>
-        <span class="badge badge-primary">Status : {{ submission['status'] }}</span>
+<div class="container mt-4">
+    <h1 class="mb-4">Submission Details</h1>
 
-        <hr>
-        <h2>Lecturer Comments</h2>
-        {% if comments %}
-            {% for comment in comments %}
-                <div class="comment">
-                    <strong>{{ comment.user.username }}</strong> ({{ comment.timestamp.strftime('%d %B %Y %H:%M:%S') }}):<br>
-                    {{ comment.text }}
+    {% if answers %}
+        {% for answer in answers %}
+            <div class="field-answer mb-2">
+                <span class="font-weight-bold">{{ fields[answer.field_id].field_name if fields.get(answer.field_id) else "Unknown Field" }}:</span>
+                <span>{{ answer.value }}</span>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="alert alert-info">No answers submitted yet.</div>
+    {% endif %}
+
+    <p><strong>Submitted At:</strong> {{ submission.date.strftime('%d %B %Y %H:%M:%S') }}</p>
+    <p class="status"><strong>Status:</strong> <span class="text-primary">{{ submission.status }}</span></p>
+
+    <hr>
+    <h2 class="mt-4">Lecturer Comments</h2>
+    {% if comments %}
+        {% for comment in comments %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">{{ comment.user.username }}</h5>
+                    <h6 class="card-subtitle mb-2 text-muted">{{ comment.timestamp.strftime('%d %B %Y %H:%M:%S') }}</h6>
+                    <p class="card-text">{{ comment.text }}</p>
                 </div>
-            {% endfor %}
-        {% else %}
-            <p>No comments from lecturer yet.</p>
-        {% endif %}
-    </div>
+
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="alert alert-secondary">No comments from lecturer yet.</div>
+    {% endif %}
+</div>
 {% endblock %}
