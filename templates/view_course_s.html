@@ -5,16 +5,19 @@
     <span class="badge badge-primary">Trimester : {{ course['trimester'] }}</span>
     <p>Course code : {{ course['code'] }}</p>
     <p>{{ course['content'] }}</p>
-    {% if assigned_templates %}
-        <ul class="list-group">
-        {% for a in assigned_templates %}
+    {% if assigned_template %}
+        {% if assigned_template.due_date %}
+            <strong>Due Date:</strong> {{ assigned_template.due_date.strftime('%Y-%m-%d %H:%M') }}
+        {% else %}
+            <em>No due date set.</em>
+        {% endif %}
         <li class="list-group-item d-flex justify-content-between align-items-center">
-            {{ a.template.name }}
+            {{ assigned_template.template.name }}
             <a href="{{ url_for('fill_template', course_id = course.id) }}" class="btn btn-sm btn-success">Fill</a>
         </li>
-        {% endfor %}
-        </ul>
     {% else %}
-        <p>No templates assigned yet.</p>
+    <div class="card mb-3" style="background-color:rgb(238, 238, 238); color: #333;">
+        <div class="card-body">
+            <p>No templates assigned yet.</p>
     {% endif %}
 {% endblock %}

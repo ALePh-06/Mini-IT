@@ -9,16 +9,6 @@
 <div class="container mt-4">
     <h2>Submission History</h2>
 
-    <form method="get" action="{{ url_for('history') }}" class="mb-4">
-        <label for="group_filter" class="form-label">Filter by Group:</label>
-        <select name="group_id" id="group_filter" class="form-select w-auto" onchange="this.form.submit()">
-            <option value="">All Groups</option>
-            {% for group in groups %}
-                <option value="{{ group.id }}" {% if group.id == selected_group_id %}selected{% endif %}>{{ group.name }}</option>
-            {% endfor %}
-        </select>
-    </form>
-
     {% for latest, data in submissions.items() %}
         <div class="card mb-3">
             <div class="card-body">
@@ -33,12 +23,6 @@
                 {% if latest.filename %}
                     <a href="{{ url_for('download', filename=latest.filename) }}" class="btn btn-link">Download File</a>
                 {% endif %}
-
-                <!-- Edit and Delete buttons -->
-                <a href="{{ url_for('edit_submission', submission_id=latest.id) }}" class="btn btn-primary btn-sm">Edit</a>
-                <form action="{{ url_for('delete_submission', submission_id=latest.id) }}" method="post" style="display:inline;">
-                    <button type="submit" onclick="return confirm('Are you sure?');" class="btn btn-danger btn-sm">Delete</button>
-                </form>
 
                 <!-- Previous version dropdown -->
                 {% if data.previous_answers %}

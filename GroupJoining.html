@@ -10,11 +10,11 @@
       <button type="submit" class="btn btn-primary">Join Group</button>
   </form>
 
-  {% if group %}
-    <div class="alert alert-info mt-3">
-      Group "{{ group.name }}" selected.
-    </div>
-  {% endif %}
+  {% if group is defined and group %}
+  <div class="alert alert-info mt-3">
+    Group "{{ group.group_code }}" selected.
+  </div>
+{% endif %}
 
   {% for message in get_flashed_messages() %}
     <div class="alert alert-danger mt-3">{{ message }}</div>
