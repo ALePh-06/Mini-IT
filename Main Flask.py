@@ -10,6 +10,9 @@ import pytz
 from pytz import timezone
 from datetime import datetime
 from collections import defaultdict
+from sqlalchemy import or_
+from itsdangerous import URLSafeTimedSerializer
+
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'mydatabase.db')
 
@@ -38,15 +41,28 @@ db = SQLAlchemy(app)
 def malaysia_time():
     return datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
 
+# Token utilities
+serializer = URLSafeTimedSerializer(app.secret_key)
+
+def generate_token(email):
+    return serializer.dumps(email, salt='password-reset-salt')
+
+def verify_token(token, expiration=3600):
+    try:
+        email = serializer.loads(token, salt='password-reset-salt', max_age=expiration)
+    except:
+        return None
+    return email
+
+
 class Users(db.Model):
     __tablename__ = 'users'
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    email = db.Column(db.String(150), unique=True, nullable=False)
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String, unique=True, nullable=False, index=True)
     password = db.Column(db.String, nullable=False)
     user_type = db.Column(db.String, nullable=False)
 
-    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'))
 
 class Course(db.Model):
     __tablename__ = 'courses'
@@ -187,6 +203,8 @@ class GroupMembers(db.Model):
     student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     student = db.relationship('Users', backref='group_memberships')
 
+    
+
 # Functions start here
 
 def get_course(course_id):
@@ -235,14 +253,16 @@ def require_login():
 @app.route('/Login', methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = request.form["username"]
+        user_input = request.form["user_input"]
         password = request.form["password"]
 
+
             # Users checker
-        user = Users.query.filter_by(username=username).first()
+        user = Users.query.filter(or_(Users.username == user_input, Users.email == user_input)).first()
 
         if user and bcrypt.checkpw(password.encode("utf-8"), user.password.encode("utf-8")):
-            session["username"] = username
+            session["username"] = user.username
+            session["email"] = user.email
             session["user_type"] = user.user_type
             session["user_id"] = user.id
             
@@ -307,6 +327,41 @@ def signup():
 
     return render_template("Signup.html") # This is the render template!!!!!!!!!!!!!!!!!!!!#
 
+# Forgot Password Route
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form['email']
+        user = Users.query.filter_by(email=email).first()
+        if user:
+            token = generate_token(email)
+            reset_url = url_for('reset_password', token=token, _external=True)
+            print(f"[DEBUG] Password reset link: {reset_url}")  # Replace with email logic
+            flash('Reset link sent to your email. (Simulated in console for now)')
+        else:
+            flash('Email not found.')
+    return render_template('templates/forgot_password.html')
+
+# Reset Password Route
+@app.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    email = verify_token(token)
+    if not email:
+        flash('Reset link is invalid or has expired.')
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        new_password = request.form['password']
+        hashed_pw = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+        user = Users.query.filter_by(email=email).first()
+        user.password = hashed_pw
+        db.session.commit()
+        flash('Password reset successful. You can now log in.')
+        return redirect(url_for('login'))
+
+    return render_template('templates/reset_password.html')
+
+
 # Join course via code function
 @app.route('/JoinCourse', methods=['GET', 'POST'])
 def JoinCourse():
@@ -326,7 +381,8 @@ def JoinCourse():
         # Check if already joined
         existing = StudentCourse.query.filter_by(student_id=student_id, course_id=course.id).first()
         if existing:
-            flash('You have already joined this course.')
+            flash('You have already enrolled in this course.')
+            
             return redirect(url_for('JoinCourse'))
 
         # Join course
@@ -334,55 +390,62 @@ def JoinCourse():
         db.session.add(join)
         db.session.commit()
         flash(f"You've successfully joined {course.title}.")
-        return redirect(url_for('index'))
+        return redirect(url_for('join_group'), course_id=course.id)
 
     return render_template('JoinCourse.html')
 
-@app.route('/course/<int:course_id>/JoinGroup', methods=['GET', 'POST'])
+@app.route('/course/<int:course_id>/join_group', methods=['GET', 'POST'])
 def join_group(course_id):
+    user = get_current_user()
+    course = Course.query.get_or_404(course_id)
+    group = None  # Define it to prevent Jinja error
+
+    if request.method == 'POST':
+        group_name = request.form.get('group_code', '').strip()
+
+        if not group_name:
+            flash("Group name is required.")
+        else:
+            group = Group.query.filter_by(name=group_name, course_id=course.id).first()
+
+            if group:
+                if len(group.members) >= 4:
+                    flash("This group is full.")
+                else:
+                    user.group_id = group.id
+                    db.session.commit()
+                    flash("Successfully joined existing group.")
+                    return redirect(url_for('view_course_s', course_id=course.id))
+            else:
+                group = Group(group_code=group_name, course_id=course.id)
+                db.session.add(group)
+                db.session.commit()
+
+                flash("New group created and joined.")
+                return redirect(url_for('view_course_s', course_id=course.id))
+
+    return render_template("GroupJoining.html", course=course, group=group)
+
+@app.route('/course/<int:course_id>/access')
+def access_course(course_id):
     if 'user_type' not in session or session['user_type'] != 'student':
-        flash('You must be logged in as a student to join a group.')
+        flash("Access denied.")
         return redirect(url_for('login'))
 
     user = get_current_user()
-    if not user:
-        flash('User not found.')
-        return redirect(url_for('login'))
+    course = Course.query.get_or_404(course_id)
 
-    if request.method == 'POST':
-        group_name = request.form['group_name'].strip()
-
-        group = Group.query.filter_by(name=group_name).first()
-        if not group:
-            flash('Group not found. Please check the group name.')
-            return redirect(url_for('join_group'))
-
-        # Check if already in a group for this course
-        course_id = group.course_id
-        joined_group_ids = db.session.query(Group.id).join(GroupMembers).filter(
-            Group.course_id == course_id,
-            GroupMembers.user_id == user.id
-        ).all()
-
-        if joined_group_ids:
-            flash('You have already joined a group for this course.')
-            return redirect(url_for('join_group'))
-
-        # Check group member count
-        member_count = GroupMembers.query.filter_by(group_id=group.id).count()
-        if member_count >= 4:
-            flash('Group is full (max 4 members).')
-            return redirect(url_for('join_group'))
-
-        # Join the group
-        membership = GroupMembers(group_id=group.id, user_id=user.id)
-        db.session.add(membership)
-        db.session.commit()
-
-        flash(f"You have successfully joined group '{group.name}'.")
+    # Ensure student is enrolled
+    enrolled = StudentCourse.query.filter_by(course_id=course.id, student_id=user.id).first()
+    if not enrolled:
+        flash("You are not enrolled in this course.")
         return redirect(url_for('index'))
 
-    return render_template('GroupJoining.html')  # Create this template
+    # Ensure student has joined a group
+    if not user.group_id:
+        return redirect(url_for('join_group', course_id=course.id))
+
+    return redirect(url_for('view_course_s', course_id=course.id))
 
 @app.route("/Logout")
 def logout():
@@ -405,15 +468,32 @@ def index():
         return render_template('Index_s.html', courses=courses)
     
 
-@app.route('/course/<int:course_id>')
+@app.route('/course/<int:course_id>', methods=['GET', 'POST'])
 def view_course(course_id):
-    course = get_course(course_id)
+    course = get_course(course_id).id
     assigned_template = AssignedTemplate.query.filter_by(course_id=course_id).first()
+    user = get_current_user()
+    group =  db.session.query(Group.id).join(GroupMembers).filter(Group.course_id == course, GroupMembers.student_id == user.id)
 
     if session['user_type'] == 'lecturer':
         return render_template('view_course.html', course=course, assigned_template=assigned_template)  # Create this template
     else:
-        return render_template('view_course_s.html', course=course, assigned_template=assigned_template)
+
+        if group == None:
+            return redirect(url_for('join_group', course_id = course))
+        
+        else:
+
+            course = Course.query.get_or_404(course_id)
+
+            # Make sure student is enrolled in the course
+            enrolled = StudentCourse.query.filter_by(course_id=course.id, student_id=user.id).first()
+            if not enrolled:
+                flash("You are not enrolled in this course.")
+                return redirect(url_for('index'))
+
+            # Render course view as usual
+            return render_template('view_course_s.html', course=course)
 
 @app.route('/create_course', methods=('GET', 'POST'))
 def create_course():
@@ -666,6 +746,7 @@ def student_history():
 
     return render_template("StudentHistory.html", submissions=submissions_dict)
 
+# LECTURER CODE!!!!!
 # Route to edit a submission
 @app.route('/submission/<int:submission_id>/edit', methods=['GET'])
 def edit_submission(submission_id):
@@ -690,6 +771,56 @@ def edit_submission(submission_id):
         answers=answers
     )
 
+
+
+# ALL CODE RELATED TO LECTURER!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# Route to display lecturer form creation page
+@app.route('/create_form', methods=['GET', 'POST'])
+def create_form():
+    # Restrict access to lecturers only
+    if 'user_type' not in session or session['user_type'] != 'lecturer':
+        flash("Access denied: You must be a lecturer to view this page.", "danger")
+        return redirect(url_for('index'))  
+    
+    if request.method == 'POST':
+        title = request.form['Title']
+        description = request.form['Description']
+        file = request.files.get('Upload_file')
+        due_date_str = request.form.get('due_date')
+
+        due_date = None
+
+        try:
+            if due_date_str:
+                due_date = datetime.strptime(due_date_str, "%Y-%m-%dT%H:%M")
+        except ValueError:
+            flash("Invalid date format.", "error")
+            return render_template('LecturerForm.html')
+
+        filename = None
+        if file and file.filename:
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+        # Localize due_date to Malaysia time
+        malaysia_tz = pytz.timezone('Asia/Kuala_Lumpur')
+        if due_date:
+            due_date = malaysia_tz.localize(due_date)
+
+        new_form = FormTemplate(
+            title=title,
+            description=description,
+            filename=filename,
+            due_date=due_date
+        )
+        db.session.add(new_form)
+        db.session.commit()
+
+        flash("Form created successfully!", "success")
+        return render_template('LecturerForm.html')
+
+    # For GET requests
+    return render_template('LecturerForm.html')
 
 # Route for submission history lecturer
 @app.route('/SubmissionHistory')
@@ -820,6 +951,17 @@ def status():
         latest_submissions = [sorted(subs, key=lambda x: x.date, reverse=True)[0] for subs in chains.values()]
 
         return render_template("status_s.html", submissions=latest_submissions)
+        # Group by original submission ID or own ID
+        chains = defaultdict(list)
+        for s in all_submissions:
+            key = s.original_id if s.original_id else s.id
+            chains[key].append(s)
+
+        # Keep only the latest version of each chain
+        latest_submissions = [sorted(subs, key=lambda x: x.timestamp, reverse=True)[0] for subs in chains.values()]
+
+        return render_template("status_s.html", submissions=latest_submissions)
+
 
 # Route for updating both status and adding comment
 @app.route("/update_status/<int:submission_id>", methods=["POST"])
