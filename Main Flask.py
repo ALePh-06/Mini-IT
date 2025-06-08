@@ -707,33 +707,41 @@ def history():
         flash("User not found.")
         return redirect(url_for('login'))
 
-    # Get all groups for the dropdown filter
-    groups = Group.query.order_by(Group.name).all()
-
-    # Get selected group_id from query string, convert to int or None
+    # Optional group filter
     selected_group_id = request.args.get('group_id', type=int)
+    groups = Group.query.order_by(Group.id).all()
 
-    # Filter submissions by group_id if selected, else all
+    # Filter by group if selected
     if selected_group_id:
-        all_submissions = Submission.query.filter(
-            Submission.group_id == selected_group_id
+        all_submissions = Submission.query.filter_by(
+            group_id=selected_group_id
         ).order_by(Submission.date.desc()).all()
     else:
         all_submissions = Submission.query.order_by(Submission.date.desc()).all()
 
-    # Group submissions into chains by original_id (or self id if original_id is None)
+    # Group submissions into chains
     chains = defaultdict(list)
     for s in all_submissions:
         key = s.original_id if s.original_id else s.id
         chains[key].append(s)
 
-    # For each chain, keep the latest and one previous version (if exists)
+    # Final structure with answer lists
     submissions_dict = {}
     for chain_submissions in chains.values():
         sorted_chain = sorted(chain_submissions, key=lambda x: x.date, reverse=True)
         latest = sorted_chain[0]
         previous = sorted_chain[1] if len(sorted_chain) > 1 else None
-        submissions_dict[latest] = [previous] if previous else []
+
+        latest_answers = SubmissionFieldAnswer.query.filter_by(submission_id=latest.id).all()
+        previous_answers = (
+            SubmissionFieldAnswer.query.filter_by(submission_id=previous.id).all()
+            if previous else []
+        )
+
+        submissions_dict[latest] = {
+            "latest_answers": latest_answers,
+            "previous_answers": previous_answers
+        }
 
     return render_template(
         'SubmissionHistory.html',
@@ -766,7 +774,7 @@ def view_submission(submission_id):
     elif user_type == 'student':
         return render_template('view_comment.html', submission=submission, comments=comments, fields=fields_dict, answers=answers)
     else:
-        abort(403)  # Forbidden for other user types
+        abort(403)  
 
 #ALL CODE RELATED TO BOTH STUDENT AND LECTURER!!!!!!!!!!!!!!
 # Route for submission status
@@ -891,35 +899,33 @@ def submit():
         return redirect(url_for('StudentForm'))
 
 # Route to handle comment submission
-@app.route('/submit_comment/<int:submission_id>', methods=['POST'])
-def submit_comment(submission_id):
-    
-    # Only allow lecturers to submit comments
-    if 'user_type' not in session or session['user_type'] != 'lecturer':
-        flash("Access denied: You must be a lecturer to view this page.", "danger")
-        return redirect(url_for('index'))  
-    
-    # Ensure user is logged in and user_id is in session
-    if 'user_id' not in session:
-        abort(403)  # or redirect to login page
-    
-    comment_text = request.form.get('comment')
-    if not comment_text:
-        flash("Comment cannot be empty.")
-        return redirect(url_for('review_submission', submission_id=submission_id))
+@app.route('/template/edit/<int:submission_id>', methods=['GET'])
+def template_edit(submission_id):
+    submission = Submission.query.get_or_404(submission_id)
 
-    # Create and save the comment
-    new_comment = Comment(
-        submission_id=submission_id,
-        user_id=session['user_id'],
-        text=comment_text,
-        timestamp=datetime.now(malaysia_time)  
+    # Ensure the student owns this submission
+    if submission.group_id != session.get("user_id"):
+        abort(403)
+
+    # Get the associated template
+    template = Template.query.get(submission.template_id)
+
+    # Get all template fields in order
+    fields = TemplateField.query.filter_by(template_id=template.id).order_by(TemplateField.field_order).all()
+
+    # Get all existing answers for this submission
+    answers = {
+        answer.field_id: answer.value
+        for answer in SubmissionFieldAnswer.query.filter_by(submission_id=submission_id).all()
+    }
+
+    return render_template(
+        'edit_template_submission.html',
+        submission=submission,
+        template=template,
+        fields=fields,
+        answers=answers
     )
-    db.session.add(new_comment)
-    db.session.commit()
-
-    flash("Comment submitted successfully!")
-    return redirect(url_for('review_submission', submission_id=submission_id))
 
 # Route for updating both status and adding comment
 @app.route("/update_status/<int:submission_id>", methods=["POST"])
@@ -958,65 +964,49 @@ malaysia_time = pytz.timezone('Asia/Kuala_Lumpur')
 @app.route('/submit_edit/<int:submission_id>', methods=['POST'])
 def submit_edit(submission_id):
     old_submission = Submission.query.get_or_404(submission_id)
-    if old_submission.user_id != session.get('user_id'):
+    if old_submission.group_id != session.get('user_id'):
         abort(403)
 
+    # Maintain chain to original
     original_id = old_submission.original_id if old_submission.original_id else old_submission.id
-    user_id = session.get('user_id')
 
-    file = request.files.get('Upload_file')
-    filename = None
-    if file and file.filename != '':
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-
+    # ✅ Step 1: Create minimal submission entry to tie answers
     new_submission = Submission(
-        user_id=user_id,
-        group_name=request.form.get('Group_Name'),
-        title=request.form.get('Title'),
-        description=request.form.get('Description'),
-        filename=filename if filename else old_submission.filename,
-        timestamp=datetime.now(malaysia_time),
-        is_late=False,
-        due_date=old_submission.due_date,
-        form_id=old_submission.form_id,
-        status='Pending',
-        course_id=old_submission.course_id,
         edited=True,
-        original_id=original_id
+        original_id=original_id,
+        template_id=old_submission.template_id,
+        group_id=old_submission.group_id  # Ensure access control works
     )
-
     db.session.add(new_submission)
-    db.session.commit()
+    db.session.commit()  # Must commit to generate new_submission.id
 
-    # Copy field answers from form
-    old_field_answers = SubmissionFieldAnswer.query.filter_by(submission_id=submission_id).all()
-    for old_answer in old_field_answers:
-        field_key = f"field_{old_answer.field_id}"
-        new_value = request.form.get(field_key)
-        if new_value is not None:
-            new_answer = SubmissionFieldAnswer(
+    # ✅ Step 2: Dynamically get all fields and tie values to submission
+    fields = TemplateField.query.filter_by(template_id=old_submission.template_id).all()
+    for field in fields:
+        form_key = f"field_{field.id}"
+        value = request.form.get(form_key)
+        if value is not None:
+            db.session.add(SubmissionFieldAnswer(
                 submission_id=new_submission.id,
-                field_id=old_answer.field_id,
-                value=new_value
-            )
-            db.session.add(new_answer)
+                field_id=field.id,
+                value=value
+            ))
 
-    # Copy old comments
+    # ✅ Step 3: Copy old comments
     old_comments = Comment.query.filter_by(submission_id=original_id).all()
     for comment in old_comments:
-        copied_comment = Comment(
+        db.session.add(Comment(
             submission_id=new_submission.id,
             user_id=comment.user_id,
             text=f"[Comment from previous version]\n{comment.text}",
             timestamp=datetime.now(malaysia_time)
-        )
-        db.session.add(copied_comment)
+        ))
 
     db.session.commit()
 
-    flash('Submission updated successfully with previous comments and answers carried over.')
+    flash('Submission updated successfully.')
     return redirect(url_for('student_history'))
+
 
 # Route to delete a submission
 @app.route('/delete_submission/<int:submission_id>', methods=['POST'])

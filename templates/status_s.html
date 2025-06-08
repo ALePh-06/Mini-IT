@@ -9,7 +9,11 @@
         <div class="card-body">
           <a href="{{ url_for('view_submission', submission_id=submission.id) }}" class="text-decoration-none">
             <h5 class="card-title mb-2">
-              {{ submission.template.name if submission.template else "Untitled Submission" }}
+              {% if submission.template and submission.template.name %}
+                {{ submission.template.name }}
+              {% else %}
+                Submission #{{ loop.index }}
+              {% endif %}
             </h5>
           </a>
           <span class="badge bg-primary">Status: {{ submission.status or "Pending" }}</span>
