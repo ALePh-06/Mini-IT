@@ -620,8 +620,6 @@ def fill_template(course_id):
     return render_template('fill_template.html', template=template, fields=fields, course_id=course_id)
 
 # Naufal Codes 
-# The code has been arranged to be more organized and readable.
-# ALL CODE RELATED TO STUDENT!!!!!!!!!!!!!!!!!!!!
 # Route to view student submission history
 @app.route('/Student/History')
 def student_history():
@@ -659,7 +657,6 @@ def student_history():
 
     return render_template("StudentHistory.html", submissions=submissions_dict)
 
-# LECTURER CODE!!!!!
 # Route to edit a submission
 @app.route('/edit_submission/<int:submission_id>', methods=['GET'])
 def edit_submission(submission_id):
@@ -761,7 +758,6 @@ def view_submission(submission_id):
     else:
         abort(403)  
 
-#ALL CODE RELATED TO BOTH STUDENT AND LECTURER!!!!!!!!!!!!!!
 # Route for submission status
 @app.route('/Status')
 def status():
@@ -793,8 +789,6 @@ def status():
 
         return render_template("status_s.html", submissions=latest_submissions)
 
-
-#ALL CODE RELATED TO SUBMIT, DOWNLOAD, AND ETC!!!!!!!!!!!!!!!!!!!!!#
 # Route for updating both status and adding comment
 @app.route("/update_status/<int:submission_id>", methods=["POST"])
 def update_status_and_comment(submission_id):
@@ -897,7 +891,6 @@ def delete_submission(submission_id):
         original = submission
 
     # Find all edits and the original
-    # Find all edits and the original
     edits = Submission.query.filter_by(original_id=original.id).all()
     all_to_delete = edits + [original]
 
@@ -906,7 +899,7 @@ def delete_submission(submission_id):
         for comment in sub.comments:
             db.session.delete(comment)
 
-    # Now delete the submissions
+    #  delete the submissions
     for sub in all_to_delete:
         db.session.delete(sub)
     all_to_delete = edits + [original]

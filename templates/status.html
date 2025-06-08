@@ -1,10 +1,10 @@
-{% extends 'base_s.html' %}
+{% extends 'base.html' %}
 
 {% block content %}
   <h2>Submissions</h2>
 
   {% for submission in submissions %}
-    <div class="card mb-3">
+    <div class="card mb-3" style="background-color:rgb(238, 238, 238); color: #333;">
       <div class="card-body">
         <a href="{{ url_for('view_submission', submission_id=submission['id']) }}">
           <h5 class="card-title">{{ submission.group_id }}</h5>
