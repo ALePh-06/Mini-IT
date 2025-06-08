@@ -667,17 +667,29 @@ def student_history():
     return render_template("StudentHistory.html", submissions=submissions_dict)
 
 # Route to edit a submission
-@app.route('/edit_submission/<int:submission_id>', methods=['GET'])
+@app.route('/submission/<int:submission_id>/edit', methods=['GET'])
 def edit_submission(submission_id):
     submission = Submission.query.get_or_404(submission_id)
-    group_id = session.get("user_id")
-
-    # Access control: check if user is owner or in same group
-    if submission.group_id != group_id:
+    if submission.group_id != session.get("user_id"):
         abort(403)
 
-    form = FormTemplate.query.first()  # adjust as needed
-    return render_template('edit_template.html', submission=submission, form=form)
+    template = Template.query.get(submission.template_id)
+    fields = TemplateField.query.filter_by(template_id=template.id).all()
+
+    # Get the current answers
+    answers = {
+        a.field_id: a.value
+        for a in SubmissionFieldAnswer.query.filter_by(submission_id=submission.id).all()
+    }
+
+    return render_template(
+        'edit_template_submission.html',
+        submission=submission,
+        template=template,
+        fields=fields,
+        answers=answers
+    )
+
 
 # Route for submission history lecturer
 @app.route('/SubmissionHistory')
@@ -779,21 +791,32 @@ def status():
 
         submissions = []
         if course_ids:
-            submissions = Submission.query.filter(Submission.course_id.in_(course_ids)).all()
+            # Get all submissions for those courses
+            all_submissions = Submission.query.filter(Submission.course_id.in_(course_ids)).order_by(Submission.date.desc()).all()
+
+            # Group submissions into chains using original_id or own id
+            chains = defaultdict(list)
+            for s in all_submissions:
+                key = s.original_id if s.original_id else s.id
+                chains[key].append(s)
+
+            # Get only the latest submission per chain
+            submissions = [sorted(subs, key=lambda x: x.date, reverse=True)[0] for subs in chains.values()]
+
         return render_template("status.html", submissions=submissions)
 
     else:
-        # Get all submissions in the user's group
+        # Student view
         group_id = session.get("user_id")
         all_submissions = Submission.query.filter_by(group_id=group_id).order_by(Submission.date.desc()).all()
 
-        # Group by original submission ID or own ID
+        # Group submissions into chains
         chains = defaultdict(list)
         for s in all_submissions:
             key = s.original_id if s.original_id else s.id
             chains[key].append(s)
 
-        # Keep only the latest version of each chain
+        # Get the latest version of each chain
         latest_submissions = [sorted(subs, key=lambda x: x.date, reverse=True)[0] for subs in chains.values()]
 
         return render_template("status_s.html", submissions=latest_submissions)
@@ -838,44 +861,45 @@ def submit_edit(submission_id):
     if old_submission.group_id != session.get('user_id'):
         abort(403)
 
-    # Maintain chain to original
     original_id = old_submission.original_id if old_submission.original_id else old_submission.id
 
-    
     new_submission = Submission(
-        edited=True,
-        original_id=original_id,
+        group_id=old_submission.group_id,
         template_id=old_submission.template_id,
-        group_id=old_submission.group_id  # Ensure access control works
+        course_id=old_submission.course_id,
+        date=datetime.now(malaysia_time),
+        status='Pending',
+        edited=True,
+        original_id=original_id
     )
     db.session.add(new_submission)
-    db.session.commit()  # Must commit to generate new_submission.id
-
-    
-    fields = TemplateField.query.filter_by(template_id=old_submission.template_id).all()
-    for field in fields:
-        form_key = f"field_{field.id}"
-        value = request.form.get(form_key)
-        if value is not None:
-            db.session.add(SubmissionFieldAnswer(
-                submission_id=new_submission.id,
-                field_id=field.id,
-                value=value
-            ))
-
-    
-    old_comments = Comment.query.filter_by(submission_id=original_id).all()
-    for comment in old_comments:
-        db.session.add(Comment(
-            submission_id=new_submission.id,
-            user_id=comment.user_id,
-            text=f"[Comment from previous version]\n{comment.text}",
-            timestamp=datetime.now(malaysia_time)
-        ))
-
     db.session.commit()
 
-    flash('Submission updated successfully.')
+    # Copy updated answers
+    fields = TemplateField.query.filter_by(template_id=old_submission.template_id).all()
+    for field in fields:
+        new_value = request.form.get(f'field_{field.id}')
+        if new_value is not None:
+            answer = SubmissionFieldAnswer(
+                submission_id=new_submission.id,
+                field_id=field.id,
+                value=new_value
+            )
+            db.session.add(answer)
+
+    # Copy old comments from the original submission chain
+    old_comments = Comment.query.filter_by(submission_id=original_id).all()
+    for comment in old_comments:
+        copied_comment = Comment(
+            submission_id=new_submission.id,
+            user_id=comment.user_id,
+            text=f"[Copied from previous version]\n{comment.text}",
+            timestamp=datetime.now(malaysia_time)
+        )
+        db.session.add(copied_comment)
+
+    db.session.commit()
+    flash("Edited submission saved successfully.")
     return redirect(url_for('student_history'))
 
 
