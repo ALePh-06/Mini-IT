@@ -149,19 +149,6 @@ class FormField(db.Model):
     
 #Answer model to link submissions with form fields
 #For asnwer of course
-#Submission template model
-class SubmissionTemplate(db.Model):
-    __tablename__ = 'submission_templates'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), nullable=False)    
-
-#Setting for submission
-class SubmissionSettings(db.Model):
-    __tablename__ = 'submissions_settings'
-    id = db.Column(db.Integer, primary_key=True)
-    template_id = db.Column(db.Integer)
-    due_date = db.Column(db.DateTime, nullable=False)
-
 #Student course model
 class StudentCourse(db.Model):
     __tablename__ = 'student_course'
@@ -404,14 +391,16 @@ def logout():
 
 @app.route('/')
 def index():
-    courses = Course.query.all()
-
     if 'user_type' not in session:
         return redirect(url_for('login'))  # force login if not authenticated
     
     if session['user_type'] == 'lecturer':
+        courses = Course.query.all()
         return render_template('Index.html', courses=courses)  # Create this template
     else:
+        student_id = get_current_user().id
+        courses = db.session.query(Course).join(StudentCourse).filter(StudentCourse.student_id == student_id).all()
+
         return render_template('Index_s.html', courses=courses)
     
 
@@ -486,7 +475,8 @@ def create_template():
 
 @app.route('/view_template')
 def view_template():
-    templates = Template.query.all()
+    current_lecturer = get_current_user().id
+    templates = db.session.query(Template).filter(Template.lecturer_id == current_lecturer)
     return render_template('view_template.html', templates=templates)
 
 @app.route('/course/<int:course_id>/assign_template', methods=['GET', 'POST'])
@@ -536,12 +526,7 @@ def assign_template_to_course(course_id):
         flash('Template assigned/replaced successfully.', 'success')
         return redirect(url_for('view_course', course_id=course_id))
 
-    return render_template(
-        'assign_template.html',
-        course=course,
-        templates=templates,
-        current_assignment=current_assignment
-    )
+    return render_template('assign_template.html', course=course, templates=templates, current_assignment=current_assignment)
 
 
 @app.route('/edit_course/<int:id>', methods=('GET', 'POST'))
@@ -629,7 +614,7 @@ def fill_template(course_id):
             db.session.add(field_answer)
 
         db.session.commit()
-        flash('Template submitted successfully.', 'success')
+        flash('Form submitted successfully.', 'success')
         return redirect(url_for('view_course', course_id=course_id))
 
     return render_template('fill_template.html', template=template, fields=fields, course_id=course_id)
@@ -803,93 +788,6 @@ def status():
 
 #ALL CODE RELATED TO SUBMIT, DOWNLOAD, AND ETC!!!!!!!!!!!!!!!!!!!!!
 # Route to handle student form submission
-@app.route('/submit', methods=['POST'])
-def submit():
-    if 'username' not in session:
-        flash("You must be logged in to submit.") 
-        return redirect(url_for('login'))
-
-    user = Users.query.filter_by(username=session['username']).first()
-    if not user:
-        flash("User not found.")
-        return redirect(url_for('login'))
-
-    # Get form data
-    group_name = request.form['Group_Name']
-    title = request.form['Title']
-    description = request.form['Description']
-    file = request.files.get('Upload_file')
-    submission_id = request.form.get("submission_id")
-
-    filename = None
-    if file and file.filename:
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-
-    form_id = request.form.get('form_id')  
-    due_date = None
-    form = None
-    is_late = False  
-
-    now = datetime.now(malaysia_time)  # Timezone-aware
-    if form_id:
-        try:
-            form_id_int = int(form_id)
-            form = FormTemplate.query.get(form_id_int)
-            if form and form.due_date:
-                due_date = form.due_date
-        except ValueError:
-            flash("Invalid form ID.", "danger")
-            return redirect(url_for('StudentForm'))
-        
-        if due_date and due_date.tzinfo is None:
-            malaysia = timezone('Asia/Kuala_Lumpur')
-            due_date = malaysia.localize(due_date)
-
-        if due_date and now > due_date:
-            is_late = True
-
-    # Use submission_id to check if editing
-    existing_submission = None
-    if submission_id:
-        try:
-            existing_submission = Submission.query.get(int(submission_id))
-        except ValueError:
-            flash("Invalid submission ID.")
-            return redirect(url_for('StudentForm'))
-
-    if existing_submission and existing_submission.user_id == user.id:
-    # Update existing submission
-        existing_submission.group_name = group_name
-        existing_submission.title = title
-        existing_submission.description = description
-        if filename:
-            existing_submission.filename = filename
-            existing_submission.timestamp = now
-            existing_submission.is_late = is_late
-            existing_submission.due_date = due_date
-            existing_submission.edited = True
-            db.session.commit()
-            flash("Submission updated successfully!", "info")
-            return redirect(url_for('student_history'))  
-    else:
-        # New submission
-        new_submission = Submission(
-            user_id=user.id,
-            group_name=group_name,
-            title=title,
-            description=description,
-            filename=filename,
-            timestamp=now,
-            is_late=is_late,
-            due_date=due_date,
-            edited=False
-        )
-        db.session.add(new_submission)
-        db.session.commit()
-        flash("Submission successful!", "success")
-        return redirect(url_for('StudentForm'))
-
 # Route to handle comment submission
 @app.route('/submit_comment/<int:submission_id>', methods=['POST'])
 def submit_comment(submission_id):

@@ -3,19 +3,13 @@
 {% block content %}
   <div class="card">
     <div class="card-body">
-      <h3 class="card-title">{{ submission.title }}</h3>
+      <h3 class="card-title">{{ submission.group_id }}</h3>
 
       {% for answer in answers %}
         <p><strong>{{ fields[answer.field_id].field_name }}:</strong> {{ answer.value }}</p>
       {% endfor %}
 
       <p><strong>Submitted At:</strong> {{ submission.date.strftime('%d %B %Y %H:%M:%S') }}</p>
-
-      {% if submission.filename %}
-        <a href="{{ url_for('static', filename='uploads/' ~ submission.filename) }}" class="btn btn-outline-primary mb-2" download>
-          Download File
-        </a>
-      {% endif %}
 
       <form method="POST" action="{{ url_for('update_status_and_comment', submission_id=submission.id) }}">
         <input type="hidden" name="status" id="statusInput" value="{{ submission.status }}">
