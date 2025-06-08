@@ -1,15 +1,21 @@
 {% extends 'base.html' %}
 
 {% block content %}
+    <br/>
     <h1>{% block title %} Welcome to ProjectProposalSystem {% endblock %}</h1>
+    <hr/>
+    <br/>
     {% for course in courses %}
-        <a href="{{ url_for('view_course', course_id=course['id']) }}">
-            <h2>{{ course['title'] }}</h2>
-        </a>
-        <span class="badge badge-primary">Trimester : {{ course['trimester'] }}</span>
-        <a href="{{ url_for('edit_course', id=course['id']) }}">
-            <span class="badge badge-warning">Edit</span>
-        </a>
-        <hr>
+    <div class="card mb-3" style="background-color:rgb(238, 238, 238); color: #333;">
+        <div class="card-body">
+            <a href="{{ url_for('view_course', course_id=course['id']) }}">
+                <h2>{{ course['title'] }}</h2>
+            </a>
+            <span class="badge badge-primary">Trimester : {{ course['trimester'] }}</span>
+            <a href="{{ url_for('edit_course', id=course['id']) }}">
+                <span class="badge badge-warning">Edit</span>
+            </a>
+        </div>
+    </div>
     {% endfor %}
 {% endblock %}
