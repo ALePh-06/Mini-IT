@@ -794,37 +794,7 @@ def status():
         return render_template("status_s.html", submissions=latest_submissions)
 
 
-#ALL CODE RELATED TO SUBMIT, DOWNLOAD, AND ETC!!!!!!!!!!!!!!!!!!!!!
-# Route to handle student form submission
-# Route to handle comment submission
-@app.route('/template/edit/<int:submission_id>', methods=['GET'])
-def template_edit(submission_id):
-    submission = Submission.query.get_or_404(submission_id)
-
-    # Ensure the student owns this submission
-    if submission.group_id != session.get("user_id"):
-        abort(403)
-
-    # Get the associated template
-    template = Template.query.get(submission.template_id)
-
-    # Get all template fields in order
-    fields = TemplateField.query.filter_by(template_id=template.id).order_by(TemplateField.field_order).all()
-
-    # Get all existing answers for this submission
-    answers = {
-        answer.field_id: answer.value
-        for answer in SubmissionFieldAnswer.query.filter_by(submission_id=submission_id).all()
-    }
-
-    return render_template(
-        'edit_template_submission.html',
-        submission=submission,
-        template=template,
-        fields=fields,
-        answers=answers
-    )
-
+#ALL CODE RELATED TO SUBMIT, DOWNLOAD, AND ETC!!!!!!!!!!!!!!!!!!!!!#
 # Route for updating both status and adding comment
 @app.route("/update_status/<int:submission_id>", methods=["POST"])
 def update_status_and_comment(submission_id):
