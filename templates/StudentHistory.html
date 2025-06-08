@@ -15,10 +15,6 @@
                         <p><strong>{{ answer.field.field_name }}:</strong> {{ answer.value }}</p>
                     {% endfor %}
 
-                    {% if latest.filename %}
-                        <a href="{{ url_for('download', filename=latest.filename) }}" class="btn btn-outline-secondary btn-sm">Download File</a>
-                    {% endif %}
-
                     <div class="mt-3 d-flex gap-2">
                         <a href="{{ url_for('edit_submission', submission_id=latest.id) }}" class="btn btn-primary btn-sm">Edit</a>
                         <form action="{{ url_for('delete_submission', submission_id=latest.id) }}" method="post" onsubmit="return confirm('Are you sure?');" class="d-inline">

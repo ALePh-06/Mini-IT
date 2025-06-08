@@ -1,40 +1,20 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <title>Edit Submission</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='FormStyle.css') }}">
-</head>
-<body>
-
-<form action="{{ url_for('submit_edit', submission_id=submission.id) }}" method="post" enctype="multipart/form-data">
-
-    <div class="group-name">
-        <label for="Group_Name">Group Name:</label>
-        <input type="text" id="Group_Name" name="Group_Name" required value="{{ submission.group_name }}">
+{% block content %}
+<h2>Fill Template: {{ template.name }}</h2>
+<form method="POST">
+  {% for field in fields %}
+    <div class="form-group">
+      <label>{{ field.field_name }}</label>
+      {% if field.field_type|lower == 'text' %}
+        <input type="Text" name="{{ field.id }}" class="form-control" required placeholder="short response">
+      {% elif field.field_type|lower == 'textarea' %}
+        <textarea name="{{ field.id }}" class="form-control" required placeholder="multi-line response"></textarea>
+      {% elif field.field_type|lower == 'date' %}
+        <input type="Date" name="{{ field.id }}" class="form-control" required>
+      {% elif field.field_type|lower == 'number' %}
+        <input type="Number" name="{{ field.id }}" class="form-control" required placeholder="numbers">
+      {% endif %}
     </div>
-
-    <div class="title">
-        <label for="Title">Title:</label>
-        <textarea id="Title" name="Title" required>{{ submission.title }}</textarea>
-    </div>
-
-    <div class="description">
-        <label for="Description">Description:</label>
-        <textarea id="Description" name="Description" required>{{ submission.description }}</textarea>
-    </div>
-
-    <label for="Upload_file">Upload file:</label>
-    {% if submission.filename %}
-        <p>Current file: <a href="{{ url_for('download', filename=submission.filename) }}">{{ submission.filename }}</a></p>
-        <p>If you want to replace, upload a new file:</p>
-    {% endif %}
-    <input type="file" id="Upload_file" name="Upload_file" accept="image/png, image/jpeg, application/pdf"><br><br>
-
-    <hr>
-
-    <button class="submit-button" type="submit">Update</button>
+  {% endfor %}
+  <button type="submit" class="btn btn-success">Submit</button>
 </form>
-
-</body>
-</html>
+{% endblock %}
