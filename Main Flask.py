@@ -114,7 +114,7 @@ class AssignedTemplate(db.Model):
 class Submission(db.Model):
     __tablename__ = 'submissions'
     id = db.Column(db.Integer, primary_key=True)
-    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False)
+    group_id = db.Column(db.String, db.ForeignKey('groups.group_code'), nullable=False)
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
     date = db.Column(db.DateTime, nullable=False, default=malaysia_time())
     due_date = db.Column(db.DateTime)
@@ -191,9 +191,8 @@ class Comment(db.Model):
 class Group(db.Model):
     __tablename__ = 'groups'
     id = db.Column(db.Integer, primary_key=True)
-    group_code = db.Column(db.String, nullable=False, unique=True)
+    name = db.Column(db.String, nullable=False)  # <-- important
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
-
     members = db.relationship('GroupMembers', backref='group', cascade="all, delete-orphan")
 
 class GroupMembers(db.Model):
@@ -231,7 +230,7 @@ def get_current_user():
 
 
 def get_student_group_id(course_id):
-    student_id = get_current_user()
+    student_id = get_current_user().id
 
     group_member = db.session.query(Group.id).join(GroupMembers).filter(
         Group.course_id == course_id,
@@ -366,37 +365,59 @@ def join_group(course_id):
     course = Course.query.get_or_404(course_id)
 
     if request.method == 'POST':
-        group_name = request.form.get('group_code', '').strip()
+        action = request.form.get('action')
+        group_name = request.form.get('group_name', '').strip()
 
         if not group_name:
             flash("Group name is required.")
             return redirect(url_for('join_group', course_id=course.id))
 
-        # Check if group name already exists in this course
-        existing_named_group = Group.query.filter_by(group_code=group_name, course_id=course.id).first()
-        if existing_named_group:
-            flash("Group name already exists. Please choose a different name.")
+        if action == 'create':
+            # Ensure unique group name in this course
+            existing_group = Group.query.filter_by(name=group_name, course_id=course.id).first()
+            if existing_group:
+                flash("Group name already exists in this course.")
+                return redirect(url_for('join_group', course_id=course.id))
+
+            # Create new group
+            new_group = Group(name=group_name, course_id=course.id)
+            db.session.add(new_group)
+            db.session.commit()
+
+            # Add user to new group
+            membership = GroupMembers(group_id=new_group.id, student_id=user.id)
+            db.session.add(membership)
+            db.session.commit()
+
+            flash("New group created and you have joined it.")
+            return redirect(url_for('view_course_s', course_id=course.id))
+
+        elif action == 'join':
+            group = Group.query.filter_by(name=group_name, course_id=course.id).first()
+            if not group:
+                flash("Group not found.")
+                return redirect(url_for('join_group', course_id=course.id))
+
+            # Check if group is full
+            if len(group.members) >= 4:
+                flash("This group is already full (4 members).")
+                return redirect(url_for('join_group', course_id=course.id))
+
+            # Add user to existing group
+            membership = GroupMembers(group_id=group.id, student_id=user.id)
+            db.session.add(membership)
+            db.session.commit()
+
+            flash("You have successfully joined the group.")
+            return redirect(url_for('view_course_s', course_id=course.id))
+
+        else:
+            flash("Invalid action.")
             return redirect(url_for('join_group', course_id=course.id))
 
-        # Generate CourseCode-XX format for group_code
-        existing_groups = Group.query.filter_by(course_id=course.id).count()
-        next_group_number = existing_groups + 1
-        group_code = f"{course.code}-{next_group_number:02d}"
-
-        # Create new group
-        new_group = Group(group_code=group_code, course_id=course.id)
-        db.session.add(new_group)
-        db.session.commit()
-
-        # Add current student as member
-        new_member = GroupMembers(group_id=new_group.id, student_id=user.id)
-        db.session.add(new_member)
-        db.session.commit()
-
-        flash(f"Group '{group_name}' created and you have been added.")
-        return redirect(url_for('view_course_s', course_id=course.id))
-
-    return render_template("GroupJoining.html", course=course)
+    # Show form
+    existing_groups = Group.query.filter_by(course_id=course.id).all()
+    return render_template("GroupJoining.html", course=course, existing_groups=existing_groups)
 
 # Join course via code function
 @app.route('/JoinCourse', methods=['GET', 'POST'])
@@ -483,7 +504,7 @@ def view_course(course_id):
         return render_template('view_course.html', course=course, assigned_template=assigned_template)  # Create this template
     else:
 
-        if group == None:
+        '''if group == None:
             return redirect(url_for('join_group', course_id = course))
         
         else:
@@ -496,8 +517,8 @@ def view_course(course_id):
                 flash("You are not enrolled in this course.")
                 return redirect(url_for('index'))
 
-            # Render course view as usual
-            return render_template('view_course_s.html', course=course)
+            # Render course view as usual'''
+    return render_template('view_course_s.html', course=course)
 
 @app.route('/create_course', methods=('GET', 'POST'))
 def create_course():
@@ -676,7 +697,7 @@ def fill_template(course_id):
         flash('Access denied: Only students can fill templates.')
         return redirect(url_for('index'))
 
-    group_id = session.get("user_id")
+    group_id = get_current_user().id
     # Get assigned template for this course
     assignment = AssignedTemplate.query.filter_by(course_id=course_id).first()
     if not assignment:
@@ -1098,5 +1119,4 @@ def delete_submission(submission_id):
     return redirect(url_for('student_history'))
 
 
-
-app.run(host="0.0.0.0", port=5000, debug=True)
+app.run(host="0.0.0.0", port=5000, debug = True)
