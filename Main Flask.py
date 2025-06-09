@@ -322,7 +322,6 @@ def signup():
             return redirect(url_for("login"))
 
         except sqlite3.IntegrityError:
-            flash("Username already exists. Please choose a different username.")
             return redirect(url_for("signup"))
 
     return render_template("Signup.html") # This is the render template!!!!!!!!!!!!!!!!!!!!#
