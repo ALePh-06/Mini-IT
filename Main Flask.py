@@ -485,7 +485,7 @@ def view_course(course_id):
         return render_template('view_course.html', course=course, assigned_template=assigned_template)  # Create this template
     else:
 
-        if group == None:
+        '''if group == None:
             return redirect(url_for('join_group', course_id = course))
         
         else:
@@ -498,8 +498,8 @@ def view_course(course_id):
                 flash("You are not enrolled in this course.")
                 return redirect(url_for('index'))
 
-            # Render course view as usual
-            return render_template('view_course_s.html', course=course)
+            # Render course view as usual'''
+    return render_template('view_course_s.html', course=course)
 
 @app.route('/create_course', methods=('GET', 'POST'))
 def create_course():
