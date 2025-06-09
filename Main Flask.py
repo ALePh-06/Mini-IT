@@ -114,7 +114,7 @@ class AssignedTemplate(db.Model):
 class Submission(db.Model):
     __tablename__ = 'submissions'
     id = db.Column(db.Integer, primary_key=True)
-    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False)
+    group_id = db.Column(db.String, db.ForeignKey('groups.group_code'), nullable=False)
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
     date = db.Column(db.DateTime, nullable=False, default=malaysia_time())
     due_date = db.Column(db.DateTime)
@@ -672,7 +672,7 @@ def fill_template(course_id):
         flash('Access denied: Only students can fill templates.')
         return redirect(url_for('index'))
 
-    group_id = session.get("user_id")
+    group_id = get_student_group_id().id
     # Get assigned template for this course
     assignment = AssignedTemplate.query.filter_by(course_id=course_id).first()
     if not assignment:
@@ -1094,5 +1094,4 @@ def delete_submission(submission_id):
     return redirect(url_for('student_history'))
 
 
-
-app.run(host="0.0.0.0", port=5000, debug=True)
+app.run(host="0.0.0.0", port=5000, debug = True)
