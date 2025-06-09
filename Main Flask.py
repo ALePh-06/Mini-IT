@@ -231,7 +231,7 @@ def get_current_user():
 
 
 def get_student_group_id(course_id):
-    student_id = get_current_user()
+    student_id = get_current_user().id
 
     group_member = db.session.query(Group.id).join(GroupMembers).filter(
         Group.course_id == course_id,
@@ -672,7 +672,7 @@ def fill_template(course_id):
         flash('Access denied: Only students can fill templates.')
         return redirect(url_for('index'))
 
-    group_id = get_student_group_id().id
+    group_id = get_current_user().id
     # Get assigned template for this course
     assignment = AssignedTemplate.query.filter_by(course_id=course_id).first()
     if not assignment:
