@@ -114,7 +114,7 @@ class AssignedTemplate(db.Model):
 class Submission(db.Model):
     __tablename__ = 'submissions'
     id = db.Column(db.Integer, primary_key=True)
-    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False)
+    group_id = db.Column(db.String, db.ForeignKey('groups.group_code'), nullable=False)
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=False)
     date = db.Column(db.DateTime, nullable=False, default=malaysia_time())
     due_date = db.Column(db.DateTime)
@@ -231,7 +231,7 @@ def get_current_user():
 
 
 def get_student_group_id(course_id):
-    student_id = get_current_user()
+    student_id = get_current_user().id
 
     group_member = db.session.query(Group.id).join(GroupMembers).filter(
         Group.course_id == course_id,
@@ -485,7 +485,7 @@ def view_course(course_id):
         return render_template('view_course.html', course=course, assigned_template=assigned_template)  # Create this template
     else:
 
-        if group == None:
+        '''if group == None:
             return redirect(url_for('join_group', course_id = course))
         
         else:
@@ -498,8 +498,8 @@ def view_course(course_id):
                 flash("You are not enrolled in this course.")
                 return redirect(url_for('index'))
 
-            # Render course view as usual
-            return render_template('view_course_s.html', course=course)
+            # Render course view as usual'''
+    return render_template('view_course_s.html', course=course)
 
 @app.route('/create_course', methods=('GET', 'POST'))
 def create_course():
@@ -678,7 +678,7 @@ def fill_template(course_id):
         flash('Access denied: Only students can fill templates.')
         return redirect(url_for('index'))
 
-    group_id = session.get("user_id")
+    group_id = get_current_user().id
     # Get assigned template for this course
     assignment = AssignedTemplate.query.filter_by(course_id=course_id).first()
     if not assignment:
@@ -1085,5 +1085,4 @@ def delete_submission(submission_id):
     return redirect(url_for('student_history'))
 
 
-
-app.run(host="0.0.0.0", port=5000, debug=True)
+app.run(host="0.0.0.0", port=5000, debug = True)
