@@ -267,7 +267,7 @@ def login():
             session["user_id"] = user.id
             
             # Redirect to a single index route
-            flash(f"Login successful! Welcome, {user.user_type}!")
+            flash(f"Login successful! Welcome, {user.username}!")
             return redirect(url_for("index"))
 
         else:
@@ -361,39 +361,6 @@ def reset_password(token):
 
     return render_template('templates/reset_password.html')
 
-
-# Join course via code function
-@app.route('/JoinCourse', methods=['GET', 'POST'])
-def JoinCourse():
-    if 'user_type' not in session or session.get('user_type') != 'student':
-        flash('You must be logged in as a student to join courses.')
-        return redirect(url_for('login'))
-
-    if request.method == 'POST':
-        course_code = request.form['course_code'].strip()
-        student_id = Users.query.filter_by(username=session['username']).first().id
-        course = Course.query.filter_by(code=course_code).first()
-
-        if not course:
-            flash('Invalid course code.')
-            return redirect(url_for('JoinCourse'))
-
-        # Check if already joined
-        existing = StudentCourse.query.filter_by(student_id=student_id, course_id=course.id).first()
-        if existing:
-            flash('You have already enrolled in this course.')
-            
-            return redirect(url_for('JoinCourse'))
-
-        # Join course
-        join = StudentCourse(student_id=student_id, course_id=course.id)
-        db.session.add(join)
-        db.session.commit()
-        flash(f"You've successfully joined {course.title}.")
-        return redirect(url_for('join_group'), course_id=course.id)
-
-    return render_template('JoinCourse.html')
-
 @app.route('/course/<int:course_id>/join_group', methods=['GET', 'POST'])
 def join_group(course_id):
     user = get_current_user()
@@ -431,6 +398,38 @@ def join_group(course_id):
         return redirect(url_for('view_course_s', course_id=course.id))
 
     return render_template("GroupJoining.html", course=course)
+
+# Join course via code function
+@app.route('/JoinCourse', methods=['GET', 'POST'])
+def JoinCourse():
+    if 'user_type' not in session or session.get('user_type') != 'student':
+        flash('You must be logged in as a student to join courses.')
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        course_code = request.form['course_code'].strip()
+        student_id = Users.query.filter_by(username=session['username']).first().id
+        course = Course.query.filter_by(code=course_code).first()
+
+        if not course:
+            flash('Invalid course code.')
+            return redirect(url_for('JoinCourse'))
+
+        # Check if already joined
+        existing = StudentCourse.query.filter_by(student_id=student_id, course_id=course.id).first()
+        if existing:
+            flash('You have already enrolled in this course.')
+            
+            return redirect(url_for('JoinCourse'))
+
+        # Join course
+        join = StudentCourse(student_id=student_id, course_id=course.id)
+        db.session.add(join)
+        db.session.commit()
+        flash(f"You've successfully joined {course.title}.")
+        return redirect(url_for('index'))
+
+    return render_template('JoinCourse.html')
 
 @app.route('/course/<int:course_id>/access')
 def access_course(course_id):
