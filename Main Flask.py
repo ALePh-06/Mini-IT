@@ -213,7 +213,7 @@ def get_current_user():
 
 
 def get_student_group_id(course_id):
-    student_id = get_current_user()
+    student_id = get_current_user().id
 
     group_member = db.session.query(Group.id).join(GroupMembers).filter(
         Group.course_id == course_id,
@@ -349,6 +349,8 @@ def join_group(course_id):
         flash('User not found.')
         return redirect(url_for('login'))
 
+    group = None
+
     if request.method == 'POST':
         group_name = request.form['group_name'].strip()
 
@@ -366,7 +368,7 @@ def join_group(course_id):
 
         if joined_group_ids:
             flash('You have already joined a group for this course.')
-            return redirect(url_for('join_group'))
+            return redirect(url_for('view_course'))
 
         # Check group member count
         member_count = GroupMembers.query.filter_by(group_id=group.id).count()
@@ -380,9 +382,9 @@ def join_group(course_id):
         db.session.commit()
 
         flash(f"You have successfully joined group '{group.name}'.")
-        return redirect(url_for('index'))
+        return redirect(url_for('view_course', course_id = course_id))
 
-    return render_template('GroupJoining.html')  # Create this template
+    return render_template('GroupJoining.html', course_id = course_id, Group = group)  # Create this template
 
 @app.route("/Logout")
 def logout():
@@ -409,10 +411,16 @@ def index():
 def view_course(course_id):
     course = get_course(course_id)
     assigned_template = AssignedTemplate.query.filter_by(course_id=course_id).first()
+    user = get_current_user()
 
     if session['user_type'] == 'lecturer':
         return render_template('view_course.html', course=course, assigned_template=assigned_template)  # Create this template
     else:
+        '''in_group = db.session.query(Group.id).join(GroupMembers).filter(Group.course_id == course_id, GroupMembers.student_id == user.id).first()
+            
+        if not in_group:
+            return redirect(url_for('join_group', course_id = course_id))
+        else:'''
         return render_template('view_course_s.html', course=course, assigned_template=assigned_template)
 
 @app.route('/create_course', methods=('GET', 'POST'))
@@ -592,7 +600,7 @@ def fill_template(course_id):
         flash('Access denied: Only students can fill templates.')
         return redirect(url_for('index'))
 
-    group_id = get_student_group_id().id
+    group_id = get_current_user().id
     # Get assigned template for this course
     assignment = AssignedTemplate.query.filter_by(course_id=course_id).first()
     if not assignment:
