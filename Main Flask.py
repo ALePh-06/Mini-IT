@@ -390,7 +390,7 @@ def JoinCourse():
         db.session.add(join)
         db.session.commit()
         flash(f"You've successfully joined {course.title}.")
-        return redirect(url_for('join_group'), course_id=course.id)
+        '''return redirect(url_for('join_group'), course_id=course.id)'''
 
     return render_template('JoinCourse.html')
 
@@ -447,9 +447,9 @@ def access_course(course_id):
         flash("You are not enrolled in this course.")
         return redirect(url_for('index'))
 
-    # Ensure student has joined a group
+    '''    # Ensure student has joined a group
     if not user.group_id:
-        return redirect(url_for('join_group', course_id=course.id))
+        return redirect(url_for('join_group', course_id=course.id))'''
 
     return redirect(url_for('view_course_s', course_id=course.id))
 
@@ -479,7 +479,7 @@ def view_course(course_id):
     course = get_course(course_id).id
     assigned_template = AssignedTemplate.query.filter_by(course_id=course_id).first()
     user = get_current_user()
-    group =  db.session.query(Group.id).join(GroupMembers).filter(Group.course_id == course, GroupMembers.student_id == user.id)
+    group =  db.session.query(Group.id).join(GroupMembers).filter(Group.course_id == course, GroupMembers.student_id == user.id).first
 
     if session['user_type'] == 'lecturer':
         return render_template('view_course.html', course=course, assigned_template=assigned_template)  # Create this template
@@ -499,7 +499,7 @@ def view_course(course_id):
                 return redirect(url_for('index'))
 
             # Render course view as usual'''
-    return render_template('view_course_s.html', course=course)
+        return render_template('view_course_s.html', course=course)
 
 @app.route('/create_course', methods=('GET', 'POST'))
 def create_course():
