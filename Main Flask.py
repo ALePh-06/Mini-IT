@@ -752,7 +752,6 @@ def student_history():
 
     return render_template("StudentHistory.html", submissions=submissions_dict)
 
-# LECTURER CODE!!!!!
 # Route to edit a submission
 @app.route('/submission/<int:submission_id>/edit', methods=['GET'])
 def edit_submission(submission_id):
@@ -777,9 +776,6 @@ def edit_submission(submission_id):
         answers=answers
     )
 
-
-
-# ALL CODE RELATED TO LECTURER!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # Route to display lecturer form creation page
 @app.route('/create_form', methods=['GET', 'POST'])
 def create_form():
@@ -957,17 +953,6 @@ def status():
         latest_submissions = [sorted(subs, key=lambda x: x.date, reverse=True)[0] for subs in chains.values()]
 
         return render_template("status_s.html", submissions=latest_submissions)
-        # Group by original submission ID or own ID
-        chains = defaultdict(list)
-        for s in all_submissions:
-            key = s.original_id if s.original_id else s.id
-            chains[key].append(s)
-
-        # Keep only the latest version of each chain
-        latest_submissions = [sorted(subs, key=lambda x: x.timestamp, reverse=True)[0] for subs in chains.values()]
-
-        return render_template("status_s.html", submissions=latest_submissions)
-
 
 # Route for updating both status and adding comment
 @app.route("/update_status/<int:submission_id>", methods=["POST"])
