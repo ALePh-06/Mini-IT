@@ -390,11 +390,11 @@ def JoinCourse():
         db.session.add(join)
         db.session.commit()
         flash(f"You've successfully joined {course.title}.")
-        return redirect(url_for('join_group'), course_id=course.id)
+        return redirect(url_for('JoinCourse'), course_id=course.id) # Change the join_group to JoinCourse atm
 
     return render_template('JoinCourse.html')
 
-@app.route('/course/<int:course_id>/join_group', methods=['GET', 'POST'])
+'''@app.route('/course/<int:course_id>/join_group', methods=['GET', 'POST'])
 def join_group(course_id):
     user = get_current_user()
     course = Course.query.get_or_404(course_id)
@@ -430,7 +430,7 @@ def join_group(course_id):
         flash(f"Group '{group_name}' created and you have been added.")
         return redirect(url_for('view_course_s', course_id=course.id))
 
-    return render_template("GroupJoining.html", course=course)
+    return render_template("GroupJoining.html", course=course)'''
 
 @app.route('/course/<int:course_id>/access')
 def access_course(course_id):
@@ -870,10 +870,12 @@ def history():
 
         latest_answers = SubmissionFieldAnswer.query.filter_by(submission_id=latest.id).all()
         previous_answers = (
-            SubmissionFieldAnswer.query.filter_by(submission_id=previous.id).all()
+        SubmissionFieldAnswer.query
+            .filter_by(submission_id=previous.id)
+            .options(db.joinedload(SubmissionFieldAnswer.submission))  
+            .all()
             if previous else []
         )
-
         submissions_dict[latest] = {
             "latest_answers": latest_answers,
             "previous_answers": previous_answers
