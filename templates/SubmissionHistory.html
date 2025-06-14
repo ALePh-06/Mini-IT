@@ -5,14 +5,26 @@
     <h2>Submission History</h2>
     <p class="text-muted">Check your student submission history. This page shows the latest submission for each group.</p>
 
+<form method="get" class="mb-3">
+    <label for="course_id">Filter by Course:</label>
+    <select name="course_id" id="course_id" onchange="this.form.submit()">
+        <option value="">All Courses</option>
+        {% for course in courses %}
+            <option value="{{ course.id }}" {% if course.id == selected_course_id %}selected{% endif %}>
+                {{ course.title }}
+            </option>
+        {% endfor %}
+    </select>
+</form>
+
+    <!--  SUBMISSION CARDS -->
     {% for latest, data in submissions.items() %}
         <div class="card mb-3">
             <div class="card-body">
-                <h3 class="card-title"> Group : {{ latest.group_id }}</h3>
-                <h3 class="card-title">Course: {{ latest.course.title if latest.course else 'Unknown' }}</h3>
+                <h4 class="card-title">Group: {{ latest.group_id }}</h4>
+                <h4 class="card-title">Course: {{ latest.course.title if latest.course else 'Unknown' }}</h4>
                 <p><strong>Submitted At:</strong> {{ latest.date.strftime('%Y-%m-%d %H:%M:%S') }}</p>
 
-                <!-- Dynamic field display -->
                 {% for answer in data.latest_answers %}
                     <p><strong>{{ answer.field.field_name }}:</strong> {{ answer.value }}</p>
                 {% endfor %}
@@ -21,19 +33,16 @@
                     <a href="{{ url_for('download', filename=latest.filename) }}" class="btn btn-link">Download File</a>
                 {% endif %}
 
-                <!-- Previous version dropdown -->
                 {% if data.previous_answers %}
                     <button class="btn btn-secondary btn-sm mt-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePrevious{{ latest.id }}" aria-expanded="false" aria-controls="collapsePrevious{{ latest.id }}">
                         Show Previous Version
                     </button>
-
                     <div class="collapse mt-2" id="collapsePrevious{{ latest.id }}">
                         <div class="card card-body">
                             <h6>Previous Version</h6>
                             {% for answer in data.previous_answers %}
                                 <p><strong>{{ answer.field.field_name }}:</strong> {{ answer.value }}</p>
                             {% endfor %}
-
                             {% if data.previous_answers[0].submission.filename %}
                                 <a href="{{ url_for('download', filename=data.previous_answers[0].submission.filename) }}" class="btn btn-link">Download File</a>
                             {% endif %}
@@ -45,7 +54,7 @@
     {% endfor %}
 </div>
 
+
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
 {% endblock %}
