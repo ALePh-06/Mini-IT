@@ -19,6 +19,7 @@ db_path = os.path.join(basedir, 'mydatabase.db')
 
 
 app = Flask(__name__)
+
 app.config['SECRET_KEY'] = '#83yUi_a'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -413,7 +414,7 @@ def assign_groups(course_id):
 
             existing_count = Group.query.filter_by(course_id=course_id).count()
             for i in range(existing_count + 1, existing_count + num_groups + 1):
-                group_c = f"{course.code}-{str(i).zfill(2)}"
+                group_c = f"{course.title}-{str(i).zfill(2)}"
                 new_group = Group(group_code=group_c, course_id=course_id, deadline=deadline)
                 db.session.add(new_group)
 
