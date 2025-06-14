@@ -15,7 +15,7 @@ from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash
 
-serializer = URLSafeTimedSerializer(app.secret_key)
+
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'mydatabase.db')
@@ -356,7 +356,7 @@ def forgot_password():
 
             msg = Message("Password Reset Request", recipients=[email])
             msg.body = f"Click the link to reset your password: {reset_link}"
-            mail.send(msg)
+            
 
             flash("A password reset link has been sent to your email.")
         else:
@@ -1007,43 +1007,29 @@ def history():
         flash("User not found.")
         return redirect(url_for('login'))
 
-    # Lecturer's courses
+    # Get all courses taught by this lecturer
     lecturer_courses = Course.query.filter_by(lecturer_id=user.id).all()
-    print(" Lecturer ID:", user.id)
-    print(" Courses for this lecturer:")
-    for course in lecturer_courses:
-        print(f"- {course.id}: {course.title}")
     course_ids = [c.id for c in lecturer_courses]
 
-    # Get course filter
+    # Get selected course from dropdown
     selected_course_id = request.args.get('course_id', type=int)
 
-    # Filter groups and submissions by course
+    #  Filter submissions directly by course_id
     if selected_course_id:
-        groups = Group.query.filter_by(course_id=selected_course_id).all()
-        group_ids = [g.id for g in groups]
-        submissions = Submission.query.filter(
-            Submission.group_id.in_(group_ids),
-            Submission.course_id == selected_course_id
-        ).order_by(Submission.date.desc()).all()
+        submissions = Submission.query.filter_by(course_id=selected_course_id).order_by(Submission.date.desc()).all()
     else:
-        groups = Group.query.filter(Group.course_id.in_(course_ids)).all()
-        group_ids = [g.id for g in groups]
-        submissions = Submission.query.filter(
-            Submission.group_id.in_(group_ids)
-        ).order_by(Submission.date.desc()).all()
+        submissions = Submission.query.filter(Submission.course_id.in_(course_ids)).order_by(Submission.date.desc()).all()
 
-    # Group submissions into chains
-    from collections import defaultdict
+    # Group submissions by original_id (to handle edits)
     chains = defaultdict(list)
     for s in submissions:
         key = s.original_id if s.original_id else s.id
         chains[key].append(s)
 
-    # Build submission dict
+    # Build dictionary with latest and previous answers
     submissions_dict = {}
-    for chain_submissions in chains.values():
-        sorted_chain = sorted(chain_submissions, key=lambda x: x.date, reverse=True)
+    for chain in chains.values():
+        sorted_chain = sorted(chain, key=lambda x: x.date, reverse=True)
         latest = sorted_chain[0]
         previous = sorted_chain[1] if len(sorted_chain) > 1 else None
 
@@ -1100,38 +1086,41 @@ def status():
     current_user = Users.query.filter_by(username=session["username"]).first()
 
     if session['user_type'] == 'lecturer':
-        # Get all courses owned by this lecturer
+        # Get all courses taught by the lecturer
         courses = Course.query.filter_by(lecturer_id=current_user.id).all()
         course_ids = [course.id for course in courses]
 
-        submissions = []
-        if course_ids:
-            # Get all submissions for those courses
+        # Get selected course_id from dropdown (if any)
+        selected_course_id = request.args.get('course_id', type=int)
+
+        # Filter submissions
+        if selected_course_id:
+            all_submissions = Submission.query.filter_by(course_id=selected_course_id).order_by(Submission.date.desc()).all()
+        else:
             all_submissions = Submission.query.filter(Submission.course_id.in_(course_ids)).order_by(Submission.date.desc()).all()
 
-            # Group submissions into chains using original_id or own id
-            chains = defaultdict(list)
-            for s in all_submissions:
-                key = s.original_id if s.original_id else s.id
-                chains[key].append(s)
+        # Group submissions into chains (original_id or id)
+        chains = defaultdict(list)
+        for s in all_submissions:
+            key = s.original_id if s.original_id else s.id
+            chains[key].append(s)
 
-            # Get only the latest submission per chain
-            submissions = [sorted(subs, key=lambda x: x.date, reverse=True)[0] for subs in chains.values()]
+        # Only keep latest submission per chain
+        submissions = [sorted(subs, key=lambda x: x.date, reverse=True)[0] for subs in chains.values()]
 
-        return render_template("status.html", submissions=submissions)
+        return render_template("status.html", submissions=submissions, courses=courses, selected_course_id=selected_course_id)
 
     else:
         # Student view
         group_id = session.get("user_id")
         all_submissions = Submission.query.filter_by(group_id=group_id).order_by(Submission.date.desc()).all()
 
-        # Group submissions into chains
+        # Group into chains
         chains = defaultdict(list)
         for s in all_submissions:
             key = s.original_id if s.original_id else s.id
             chains[key].append(s)
 
-        # Get the latest version of each chain
         latest_submissions = [sorted(subs, key=lambda x: x.date, reverse=True)[0] for subs in chains.values()]
 
         return render_template("status_s.html", submissions=latest_submissions)
