@@ -528,7 +528,13 @@ def select_group(course_id):
         .all()
     )
     user = get_current_user()
-    malaysia_now = datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
+    malaysia_tz = pytz.timezone('Asia/Kuala_Lumpur')
+    malaysia_now = datetime.now(malaysia_tz)    
+
+    # Localize group deadlines if naive
+    for g in groups:
+        if g.deadline and g.deadline.tzinfo is None:
+            g.deadline = malaysia_tz.localize(g.deadline)
 
     group = (
         db.session.query(Group)
