@@ -18,21 +18,17 @@
     {% else %}
     <div class="card mb-3" style="background-color:rgb(238, 238, 238); color: #333;">
         <div class="card-body">
-            <p>No templates assigned yet.</p>
+            <p>No templates assigned yet.</p>   
+            </div>
+        </div>
     {% endif %}
 
-    {% if not group %}
-        <div class="alert alert-warning mt-4">
-            <strong>You are not in a group for this course.</strong>
-            <form method="POST" class="form-inline mt-2">
-                <input type="text" name="group_code" class="form-control mr-2" placeholder="Enter group code (e.g. {{ course.code }}-01)" required>
-                <button type="submit" class="btn btn-primary">Join / Create Group</button>
-            </form>
-        </div>
-    {% else %}
-        <div class="alert alert-success mt-4">
-            You are in group <strong>{{ group.group_code }}</strong>.
-        </div>
-    {% endif %}
+    <hr>
+
+<div class="mt-4">
+    <a href="{{ url_for('select_group', course_id=course.id) }}" class="btn btn-primary">
+        Join Group
+    </a>
+</div>
 
 {% endblock %}

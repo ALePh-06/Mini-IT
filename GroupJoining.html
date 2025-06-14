@@ -1,22 +1,64 @@
-{% extends 'base_s.html' %}
+{% extends 'base.html' %}
 
 {% block content %}
-  <h3>Join a Group for {{ course.title }}</h3>
-  <form method="POST">
-      <div class="form-group">
-          <label for="group_code">Enter your group name:</label>
-          <input type="text" class="form-control" name="group_code" placeholder="e.g. {{ course.code }}-01" required>
-      </div>
-      <button type="submit" class="btn btn-primary">Join Group</button>
-  </form>
+<div class="container mt-4">
+    <h2>Join a Group for {{ course.title }}</h2>
 
-  {% if group is defined and group %}
-  <div class="alert alert-info mt-3">
-    Group "{{ group.group_code }}" selected.
-  </div>
-{% endif %}
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+        <div class="alert alert-info">
+            {% for message in messages %}
+                {{ message }}<br>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% endwith %}
 
-  {% for message in get_flashed_messages() %}
-    <div class="alert alert-danger mt-3">{{ message }}</div>
-  {% endfor %}
+    <div class="row">
+        {% for group in groups %}
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">{{ group.group_code }}</h5>
+                    <p class="card-text">
+                        <strong>Members:</strong>
+                        <ul>
+                            {% for member in group.members %}
+                                <li>{{ member.student.username }}</li>
+                            {% else %}
+                                <li class="text-muted">No members yet</li>
+                            {% endfor %}
+                        </ul>
+                        <strong>{{ group.members|length }}/4 members</strong>
+                    </p>
+
+                    {% if my_group %}
+                        {% if my_group.id == group.id %}
+                            <form method="POST">
+                                <input type="hidden" name="group_id" value="{{ group.id }}">
+                                <input type="hidden" name="action" value="leave">
+                                <button type="submit" class="btn btn-danger">Leave Group</button>
+                            </form>
+                        {% else %}
+                            <button class="btn btn-secondary" disabled>Already in another group</button>
+                        {% endif %}
+                    {% else %}
+                        {% if group.members|length < 4 %}
+                            <form method="POST">
+                                <input type="hidden" name="group_id" value="{{ group.id }}">
+                                <input type="hidden" name="action" value="join">
+                                <button type="submit" class="btn btn-success">Join Group</button>
+                            </form>
+                        {% else %}
+                            <button class="btn btn-secondary" disabled>Group Full</button>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <a href="{{ url_for('view_course', course_id=course.id) }}" class="btn btn-outline-primary mt-3">Back to Course</a>
+</div>
 {% endblock %}

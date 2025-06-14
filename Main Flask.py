@@ -191,10 +191,10 @@ class Comment(db.Model):
 class Group(db.Model):
     __tablename__ = 'groups'
     id = db.Column(db.Integer, primary_key=True)
-    group_code = db.Column(db.String, nullable=False, unique=True)
+    group_code = db.Column(db.String(100), nullable=False)  # <-- important
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
-
     members = db.relationship('GroupMembers', backref='group', cascade="all, delete-orphan")
+    deadline = db.Column(db.DateTime, nullable=True)
 
 class GroupMembers(db.Model):
     __tablename__ = 'group_members'
@@ -267,7 +267,7 @@ def login():
             session["user_id"] = user.id
             
             # Redirect to a single index route
-            flash(f"Login successful! Welcome, {user.user_type}!")
+            flash(f"Login successful! Welcome, {user.username}!")
             return redirect(url_for("index"))
 
         else:
@@ -322,7 +322,6 @@ def signup():
             return redirect(url_for("login"))
 
         except sqlite3.IntegrityError:
-            flash("Username already exists. Please choose a different username.")
             return redirect(url_for("signup"))
 
     return render_template("Signup.html") # This is the render template!!!!!!!!!!!!!!!!!!!!#
@@ -390,47 +389,9 @@ def JoinCourse():
         db.session.add(join)
         db.session.commit()
         flash(f"You've successfully joined {course.title}.")
-        return redirect(url_for('join_group'), course_id=course.id)
+        return redirect(url_for('index'))
 
     return render_template('JoinCourse.html')
-
-@app.route('/course/<int:course_id>/join_group', methods=['GET', 'POST'])
-def join_group(course_id):
-    user = get_current_user()
-    course = Course.query.get_or_404(course_id)
-
-    if request.method == 'POST':
-        group_name = request.form.get('group_code', '').strip()
-
-        if not group_name:
-            flash("Group name is required.")
-            return redirect(url_for('join_group', course_id=course.id))
-
-        # Check if group name already exists in this course
-        existing_named_group = Group.query.filter_by(group_code=group_name, course_id=course.id).first()
-        if existing_named_group:
-            flash("Group name already exists. Please choose a different name.")
-            return redirect(url_for('join_group', course_id=course.id))
-
-        # Generate CourseCode-XX format for group_code
-        existing_groups = Group.query.filter_by(course_id=course.id).count()
-        next_group_number = existing_groups + 1
-        group_code = f"{course.code}-{next_group_number:02d}"
-
-        # Create new group
-        new_group = Group(group_code=group_code, course_id=course.id)
-        db.session.add(new_group)
-        db.session.commit()
-
-        # Add current student as member
-        new_member = GroupMembers(group_id=new_group.id, student_id=user.id)
-        db.session.add(new_member)
-        db.session.commit()
-
-        flash(f"Group '{group_name}' created and you have been added.")
-        return redirect(url_for('view_course_s', course_id=course.id))
-
-    return render_template("GroupJoining.html", course=course)
 
 @app.route('/course/<int:course_id>/access')
 def access_course(course_id):
@@ -452,6 +413,127 @@ def access_course(course_id):
         return redirect(url_for('join_group', course_id=course.id))
 
     return redirect(url_for('view_course_s', course_id=course.id))
+
+# Lecturer Group Assignment
+@app.route('/course/<int:course_id>/assign_groups', methods=['GET', 'POST'])
+def assign_groups(course_id):
+    course = Course.query.get(course_id)
+    if request.method == 'POST':
+        try:
+            num_groups = int(request.form['num_groups'])
+            deadline_str = request.form['deadline']
+            
+            # Localize to Malaysia time
+            malaysia_tz = pytz.timezone('Asia/Kuala_Lumpur')
+            naive_deadline = datetime.strptime(deadline_str, '%Y-%m-%dT%H:%M')
+            deadline = malaysia_tz.localize(naive_deadline)
+
+            if num_groups < 1:
+                flash("Minimum one group required.")
+                return redirect(url_for('assign_groups', course_id=course_id))
+
+            existing_count = Group.query.filter_by(course_id=course_id).count()
+            for i in range(existing_count + 1, existing_count + num_groups + 1):
+                group_c = f"{course.code}-{str(i).zfill(2)}"
+                new_group = Group(group_code=group_c, course_id=course_id, deadline=deadline)
+                db.session.add(new_group)
+
+            db.session.commit()
+            flash("Groups created successfully.")
+            return redirect(url_for('view_course', course_id=course_id))
+        except Exception as e:
+            flash(str(e))
+
+    return render_template('assign_groups.html', course=course)
+
+# Student Join/Leave Group
+@app.route('/course/<int:course_id>/join_group', methods=['GET', 'POST'])
+def join_group(course_id):
+    course = Course.query.get(course_id)
+    user = get_current_user()
+
+    # To check already in a group
+    group_member = GroupMembers.query.join(Group).filter(GroupMembers.student_id == user.id, Group.course_id == course_id).first()
+    my_group = group_member.group if group_member else None
+    groups = Group.query.filter_by(course_id=course_id).all()
+
+    # Time
+    # Malaysia time
+    malaysia_tz = pytz.timezone('Asia/Kuala_Lumpur')
+    malaysia_now = datetime.now(malaysia_tz)
+
+    # Convert deadlines to aware datetimes
+    for g in groups:
+        if g.deadline and g.deadline.tzinfo is None:
+            g.deadline = malaysia_tz.localize(g.deadline)
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        group_id = int(request.form.get('group_id'))
+
+        if action == 'join':
+            target_group = Group.query.get_or_404(group_id)
+            member_count = GroupMembers.query.filter_by(group_id=group_id).count()
+            
+            if member_count >= 4:
+                flash("Group is full")
+            elif my_group:
+                flash("You already joined the group")
+            else:
+                new_member = GroupMembers(group_id=group_id, student_id=user.id)
+                db.session.add(new_member)
+                db.session.commit()
+                flash(f'You have joined {target_group.group_code}')
+                return redirect(url_for('join_group', course_id=course_id))
+            
+        elif action == 'leave' and my_group and my_group.id == group_id:
+            GroupMembers.query.filter_by(group_id=group_id, student_id=user.id).delete()
+            db.session.commit()
+            flash('You have left the group.')
+            return redirect(url_for('join_group', course_id=course_id))
+
+    return render_template('select_group.html', course=course, groups=groups, group=my_group, malaysia_now=malaysia_now)
+
+@app.route('/course/<int:course_id>/leave_group', methods=['POST'])
+def leave_group(course_id):
+    user = Users.query.filter_by(username=session['username']).first()
+    membership = GroupMembers.query.join(Group).filter(GroupMembers.student_id == user.id, Group.course_id == course_id).first()
+
+    if membership:
+        malaysia_tz = pytz.timezone('Asia/Kuala_Lumpur')
+        now = datetime.now(malaysia_tz)
+
+        if now < membership.group.deadline.astimezone(malaysia_tz):
+            db.session.delete(membership)
+            db.session.commit()
+            flash("You have left the group.")
+        else:
+            flash("Deadline to leave the group has passed.")
+    else:
+        flash("You are not in a group.")
+
+    return redirect(url_for('join_group', course_id=course_id))
+
+@app.route('/course/<int:course_id>/select_group')
+def select_group(course_id):
+    course = Course.query.get_or_404(course_id)
+    groups = (
+        db.session.query(Group)
+        .filter_by(course_id=course_id)
+        .options(db.joinedload(Group.members).joinedload(GroupMembers.student))
+        .all()
+    )
+    user = get_current_user()
+    malaysia_now = datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
+
+    group = (
+        db.session.query(Group)
+        .join(GroupMembers)
+        .filter(Group.course_id == course_id, GroupMembers.student_id == user.id)
+        .first()
+    )
+
+    return render_template('select_group.html', course=course, groups=groups, group=group, malaysia_now=malaysia_now)
 
 @app.route("/Logout")
 def logout():
@@ -476,30 +558,43 @@ def index():
 
 @app.route('/course/<int:course_id>', methods=['GET', 'POST'])
 def view_course(course_id):
-    course = get_course(course_id).id
+
+    malaysia_tz = timezone('Asia/Kuala_Lumpur')
+    course = get_course(course_id)
     assigned_template = AssignedTemplate.query.filter_by(course_id=course_id).first()
     user = get_current_user()
-    group =  db.session.query(Group.id).join(GroupMembers).filter(Group.course_id == course, GroupMembers.student_id == user.id)
+
+    group =  (
+        db.session.query(Group)
+        .join(GroupMembers)
+        .filter(Group.course_id == course.id, GroupMembers.student_id == user.id)
+        .first()
+    )
+     # The groups for this course (to display group boxes later)
+    groups = (
+        db.session.query(Group)
+        .filter_by(course_id=course.id)
+        .options(db.joinedload(Group.members).joinedload(GroupMembers.student))
+        .all()
+    )
 
     if session['user_type'] == 'lecturer':
-        return render_template('view_course.html', course=course, assigned_template=assigned_template)  # Create this template
+        return render_template('view_course.html', course=course, assigned_template=assigned_template.id if assigned_template else None)  # Create this template
     else:
+        # Check enrollment
+        enrolled = StudentCourse.query.filter_by(course_id=course.id, student_id=user.id).first()
+        if not enrolled:
+            flash("You are not enrolled in this course.")
+            return redirect(url_for('index'))
 
-        '''if group == None:
-            return redirect(url_for('join_group', course_id = course))
-        
-        else:
-
-            course = Course.query.get_or_404(course_id)
-
-            # Make sure student is enrolled in the course
-            enrolled = StudentCourse.query.filter_by(course_id=course.id, student_id=user.id).first()
-            if not enrolled:
-                flash("You are not enrolled in this course.")
-                return redirect(url_for('index'))
-
-            # Render course view as usual'''
-    return render_template('view_course_s.html', course=course)
+        return render_template(
+            'view_course_s.html',
+            course=course,
+            assigned_template=assigned_template,
+            group=group,
+            groups=groups,
+            namespace={'utcnow': datetime.now(malaysia_tz)}
+        )
 
 @app.route('/create_course', methods=('GET', 'POST'))
 def create_course():

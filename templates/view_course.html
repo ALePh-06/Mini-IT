@@ -33,4 +33,14 @@
   </div>
 {% endif %}
 
+<hr class="my-4">
+
+<!--  New Section: Group Assignment Button -->
+<div class="text-center mt-4">
+  <h5>Manage Group Assignments</h5>
+  <a href="{{ url_for('assign_groups', course_id=course.id) }}" class="btn btn-outline-primary mt-2">
+    Assign / Create Groups
+  </a>
+</div>
+
 {% endblock %}
