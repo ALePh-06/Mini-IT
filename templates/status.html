@@ -3,6 +3,19 @@
 {% block content %}
   <h2>Submissions</h2>
 
+  <form method="get" class="mb-3">
+    <label for="course_id">Filter by Course:</label>
+    <select name="course_id" id="course_id" onchange="this.form.submit()">
+        <option value="">All Courses</option>
+        {% for course in courses %}
+            <option value="{{ course.id }}" {% if course.id == selected_course_id %}selected{% endif %}>
+                {{ course.title }}
+            </option>
+        {% endfor %}
+    </select>
+</form>
+
+
   {% for submission in submissions %}
     <div class="card mb-3" style="background-color:rgb(238, 238, 238); color: #333;">
       <div class="card-body">
