@@ -17,7 +17,6 @@ from werkzeug.security import generate_password_hash
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'mydatabase.db')
 
-
 app = Flask(__name__)
 
 app.config['SECRET_KEY'] = '#83yUi_a'
@@ -338,6 +337,7 @@ def signup():
             return redirect(url_for("signup"))
 
     return render_template("Signup.html") # This is the render template!!!!!!!!!!!!!!!!!!!!#
+
 
 # Join course via code function
 @app.route('/JoinCourse', methods=['GET', 'POST'])
