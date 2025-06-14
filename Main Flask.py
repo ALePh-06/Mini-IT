@@ -11,17 +11,14 @@ from pytz import timezone
 from datetime import datetime
 from collections import defaultdict
 from sqlalchemy import or_
-from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
-from flask_mail import Mail, Message
-from werkzeug.security import generate_password_hash
-
-serializer = URLSafeTimedSerializer(app.secret_key)
+from itsdangerous import URLSafeTimedSerializer
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'mydatabase.db')
 
 
 app = Flask(__name__)
+
 app.config['SECRET_KEY'] = '#83yUi_a'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -341,63 +338,6 @@ def signup():
 
     return render_template("Signup.html") # This is the render template!!!!!!!!!!!!!!!!!!!!#
 
-# Forgot Password Route
-@app.route('/forgot_password', methods=['GET', 'POST'])
-def forgot_password():
-    if request.method == 'POST':
-        email = request.form.get('email')
-        user = Users.query.filter_by(email=email).first()
-        if user:
-            token = serializer.dumps(user.username, salt='password-reset-salt')
-            reset_link = url_for('reset_password', token=token, _external=True)
-
-            # --- For demo: print the link to console
-            print(f"Password reset link: {reset_link}")
-
-            msg = Message("Password Reset Request", recipients=[email])
-            msg.body = f"Click the link to reset your password: {reset_link}"
-            mail.send(msg)
-
-            flash("A password reset link has been sent to your email.")
-        else:
-            flash("Email not found.")
-
-        return redirect(url_for('login'))
-
-    return render_template('forgot_password.html')
-
-
-# Reset Password Route
-@app.route('/reset_password/<token>', methods=['GET', 'POST'])
-def reset_password(token):
-    try:
-        username = serializer.loads(token, salt='password-reset-salt', max_age=3600)  # 1 hour validity
-    except SignatureExpired:
-        flash("The password reset link has expired.")
-        return redirect(url_for('forgot_password'))
-    except BadSignature:
-        flash("Invalid or tampered link.")
-        return redirect(url_for('forgot_password'))
-
-    user = Users.query.filter_by(username=username).first_or_404()
-
-    if request.method == 'POST':
-        new_password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
-
-        if not new_password or not confirm_password:
-            flash("Please fill in all fields.")
-        elif new_password != confirm_password:
-            flash("Passwords do not match.")
-        else:
-            user.password = generate_password_hash(new_password)
-            db.session.commit()
-            flash("Your password has been reset successfully. Please log in.")
-            return redirect(url_for('login'))
-
-    return render_template('reset_password.html')
-
-
 # Join course via code function
 @app.route('/JoinCourse', methods=['GET', 'POST'])
 def JoinCourse():
@@ -473,7 +413,7 @@ def assign_groups(course_id):
 
             existing_count = Group.query.filter_by(course_id=course_id).count()
             for i in range(existing_count + 1, existing_count + num_groups + 1):
-                group_c = f"{course.code}-{str(i).zfill(2)}"
+                group_c = f"{course.title}-{str(i).zfill(2)}"
                 new_group = Group(group_code=group_c, course_id=course_id, deadline=deadline)
                 db.session.add(new_group)
 
