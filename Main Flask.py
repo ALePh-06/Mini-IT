@@ -29,12 +29,12 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 db = SQLAlchemy(app)
 
-if os.path.exists(db_path):
+'''if os.path.exists(db_path):
     try:
         os.remove(db_path)
         print("Database deleted.")
     except PermissionError:
-        print("Database is in use. Close other processes using it first.")
+        print("Database is in use. Close other processes using it first.")'''
 
 # SQLAlchemy models //////
 
@@ -78,7 +78,7 @@ class Course(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String, nullable=False)
     trimester = db.Column(db.Integer, nullable=False)
-    code = db.Column(db.String, nullable=False)
+    code = db.Column(db.String, nullable=False, unique = True)
     content = db.Column(db.String, nullable=False)
 
     lecturer_id = db.Column(db.Integer, db.ForeignKey('users.id'))
@@ -631,10 +631,15 @@ def create_course():
         elif not code:
             flash('Code is required!')
         else:
-            new_course = Course(title=title, trimester=int(trimester), code=code, content=content, lecturer_id=current_user.id)
-            db.session.add(new_course)
-            db.session.commit()
-            return redirect(url_for('index'))
+            # Check for duplicate course code
+            existing_course = Course.query.filter_by(code=code).first()
+            if existing_course:
+                flash(f"A course with the code '{code}' already exists!", 'danger')
+            else:
+                new_course = Course(title=title, trimester=int(trimester), code=code, content=content, lecturer_id=current_user.id)
+                db.session.add(new_course)
+                db.session.commit()
+                return redirect(url_for('index'))
 
     return render_template('create_course.html')
 
@@ -777,6 +782,10 @@ def edit_template(id):
 @app.route('/course/<int:id>/delete', methods=('POST',))
 def delete_course(id):
     course = get_course(id)
+    assigned_template = AssignedTemplate.query.filter_by(course_id=course).first()
+    if assigned_template != None:
+        db.session.delete(assigned_template)
+
     db.session.delete(course)
     db.session.commit()
     flash(f'Course "{course.title}" was successfully deleted!')
@@ -792,8 +801,15 @@ def fill_template(course_id):
         flash('Access denied: Only students can fill templates.')
         return redirect(url_for('index'))
 
-    group_id = get_current_user().id
+    user_id = get_current_user().id
+    group = db.session.query(Group.group_code).join(GroupMembers).filter(Group.course_id ==course_id, GroupMembers.student_id == user_id).first()
 
+    if not group:
+        flash('You must join a group to fill this template.')
+        return redirect(url_for('join_group', course_id=course_id))
+
+    group_id = group.group_code
+    
     assignment = AssignedTemplate.query.filter_by(course_id=course_id).first()
     if not assignment:
         flash('No template assigned to this course yet.')
@@ -852,31 +868,41 @@ def student_history():
     if user.user_type != "student":
         abort(403)
 
-    group_id = session.get("user_id")
-    all_submissions = Submission.query.filter_by(group_id=group_id).order_by(Submission.date.desc()).all()
+    # Get all groups the student is part of
+    group_memberships = db.session.query(Group).join(GroupMembers).filter(
+        GroupMembers.student_id == user.id
+    ).all()
 
-    chains = defaultdict(list)
-    for s in all_submissions:
-        key = s.original_id if s.original_id else s.id
-        chains[key].append(s)
+    # Prepare a mapping from group_code -> list of submissions
+    group_submissions = {}
 
-    submissions_dict = {}
-    for chain in chains.values():
-        sorted_chain = sorted(chain, key=lambda x: x.date, reverse=True)
-        latest = sorted_chain[0]
-        previous = sorted_chain[1] if len(sorted_chain) > 1 else None
+    for group in group_memberships:
+        submissions = Submission.query.filter_by(group_id=group.group_code).order_by(Submission.date.desc()).all()
 
-        # Fetch answers for each version
-        latest_answers = SubmissionFieldAnswer.query.filter_by(submission_id=latest.id).all()
-        previous_answers = SubmissionFieldAnswer.query.filter_by(submission_id=previous.id).all() if previous else []
+        # Chain handling
+        chains = defaultdict(list)
+        for s in submissions:
+            key = s.original_id if s.original_id else s.id
+            chains[key].append(s)
 
-        if latest:
+        submissions_dict = {}
+        for chain in chains.values():
+            sorted_chain = sorted(chain, key=lambda x: x.date, reverse=True)
+            latest = sorted_chain[0]
+            previous = sorted_chain[1] if len(sorted_chain) > 1 else None
+
+            # Fetch answers
+            latest_answers = SubmissionFieldAnswer.query.filter_by(submission_id=latest.id).all()
+            previous_answers = SubmissionFieldAnswer.query.filter_by(submission_id=previous.id).all() if previous else []
+
             submissions_dict[latest] = {
                 'latest_answers': latest_answers,
                 'previous_answers': previous_answers
             }
 
-    return render_template("StudentHistory.html", submissions=submissions_dict)
+        group_submissions[group.group_code] = submissions_dict
+
+    return render_template("StudentHistory.html", group_submissions=group_submissions)
 
 # Route to edit a submission
 @app.route('/submission/<int:submission_id>/edit', methods=['GET'])
@@ -913,54 +939,6 @@ def edit_submission(submission_id):
         fields=fields,
         answers=answers,
     )
-
-# Route to display lecturer form creation page
-@app.route('/create_form', methods=['GET', 'POST'])
-def create_form():
-    # Restrict access to lecturers only
-    if 'user_type' not in session or session['user_type'] != 'lecturer':
-        flash("Access denied: You must be a lecturer to view this page.", "danger")
-        return redirect(url_for('index'))  
-    
-    if request.method == 'POST':
-        title = request.form['Title']
-        description = request.form['Description']
-        file = request.files.get('Upload_file')
-        due_date_str = request.form.get('due_date')
-
-        due_date = None
-
-        try:
-            if due_date_str:
-                due_date = datetime.strptime(due_date_str, "%Y-%m-%dT%H:%M")
-        except ValueError:
-            flash("Invalid date format.", "error")
-            return render_template('LecturerForm.html')
-
-        filename = None
-        if file and file.filename:
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-
-        # Localize due_date to Malaysia time
-        malaysia_tz = pytz.timezone('Asia/Kuala_Lumpur')
-        if due_date:
-            due_date = malaysia_tz.localize(due_date)
-
-        new_form = FormTemplate(
-            title=title,
-            description=description,
-            filename=filename,
-            due_date=due_date
-        )
-        db.session.add(new_form)
-        db.session.commit()
-
-        flash("Form created successfully!", "success")
-        return render_template('LecturerForm.html')
-
-    # For GET requests
-    return render_template('LecturerForm.html')
 
 # Route for submission history lecturer
 @app.route('/SubmissionHistory')
@@ -1071,11 +1049,11 @@ def view_submission(submission_id):
 # Route for submission status
 @app.route('/Status')
 def status():
-    current_user = Users.query.filter_by(username=session["username"]).first()
+    user = get_current_user()
 
     if session['user_type'] == 'lecturer':
         # Get all courses owned by this lecturer
-        courses = Course.query.filter_by(lecturer_id=current_user.id).all()
+        courses = Course.query.filter_by(lecturer_id=user.id).all()
         course_ids = [course.id for course in courses]
 
         submissions = []
@@ -1096,7 +1074,8 @@ def status():
 
     else:
         # Student view
-        group_id = session.get("user_id")
+        group = db.session.query(Group).join(GroupMembers).filter(GroupMembers.student_id == user.id).all()
+        group_id = group.group_code
         all_submissions = Submission.query.filter_by(group_id=group_id).order_by(Submission.date.desc()).all()
 
         # Group submissions into chains
