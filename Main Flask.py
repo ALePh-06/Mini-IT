@@ -29,12 +29,12 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 db = SQLAlchemy(app)
 
-'''if os.path.exists(db_path):
+if os.path.exists(db_path):
     try:
         os.remove(db_path)
         print("Database deleted.")
     except PermissionError:
-        print("Database is in use. Close other processes using it first.")'''
+        print("Database is in use. Close other processes using it first.")
 
 # SQLAlchemy models //////
 
@@ -194,7 +194,7 @@ class Group(db.Model):
     group_code = db.Column(db.String(100), nullable=False)  # <-- important
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
     members = db.relationship('GroupMembers', backref='group', cascade="all, delete-orphan")
-    deadline = db.Column(db.DateTime, nullable=True)
+    deadline = db.Column(db.DateTime(timezone=True), nullable=True)
 
 class GroupMembers(db.Model):
     __tablename__ = 'group_members'
