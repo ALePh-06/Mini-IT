@@ -11,13 +11,10 @@ from pytz import timezone
 from datetime import datetime
 from collections import defaultdict
 from sqlalchemy import or_
-<<<<<<< HEAD
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash
-=======
 from itsdangerous import URLSafeTimedSerializer
->>>>>>> 69aed4c519ea382ce0bafeef3aba8c75cede0665
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'mydatabase.db')
@@ -344,7 +341,6 @@ def signup():
 
     return render_template("Signup.html") # This is the render template!!!!!!!!!!!!!!!!!!!!#
 
-<<<<<<< HEAD
 # Forgot Password Route
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
@@ -401,8 +397,6 @@ def reset_password(token):
     return render_template('reset_password.html')
 
 
-=======
->>>>>>> 69aed4c519ea382ce0bafeef3aba8c75cede0665
 # Join course via code function
 @app.route('/JoinCourse', methods=['GET', 'POST'])
 def JoinCourse():
