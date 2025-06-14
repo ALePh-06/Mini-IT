@@ -3,7 +3,7 @@
 {% block content %}
   <div class="card">
     <div class="card-body" style="background-color:rgb(238, 238, 238); color: #333;">
-      <h3 class="card-title">{{ submission.group_id }}</h3>
+      <h3 class="card-title"> Group : {{ submission.group_id }}</h3>
 
       {% for answer in answers %}
         <p><strong>{{ fields[answer.field_id].field_name }}:</strong> {{ answer.value }}</p>

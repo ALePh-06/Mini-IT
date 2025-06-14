@@ -123,6 +123,8 @@ class Submission(db.Model):
     edited = db.Column(db.Boolean, default=False)  
     original_id = db.Column(db.Integer, db.ForeignKey('submissions.id'), nullable=True) # Original submission ID for edits
     values = db.relationship('SubmissionFieldAnswer', backref='submission', cascade="all, delete-orphan")
+    
+    course = db.relationship('Course', backref='submissions')
 
     edits = db.relationship(
         "Submission",
@@ -853,7 +855,12 @@ def student_history():
 @app.route('/submission/<int:submission_id>/edit', methods=['GET'])
 def edit_submission(submission_id):
     submission = Submission.query.get_or_404(submission_id)
-    if submission.group_id != session.get("user_id"):
+    group_id = get_student_group_id(submission.course_id)
+    
+    print("Submission group_id:", submission.group_id, type(submission.group_id))
+    print("Student group_id:", group_id, type(group_id))
+
+    if int(submission.group_id) != int(group_id):
         abort(403)
 
     template = Template.query.get(submission.template_id)
@@ -940,25 +947,26 @@ def history():
         flash("User not found.")
         return redirect(url_for('login'))
 
-    # Optional group filter
+    # Find courses and groups that belong to this lecturer
+    lecturer_courses = Course.query.filter_by(lecturer_id=user.id).all()
+    course_ids = [c.id for c in lecturer_courses]
+
+    groups = Group.query.filter(Group.course_id.in_(course_ids)).all()
     selected_group_id = request.args.get('group_id', type=int)
-    groups = Group.query.order_by(Group.id).all()
 
-    # Filter by group if selected
     if selected_group_id:
-        all_submissions = Submission.query.filter_by(
-            group_id=selected_group_id
-        ).order_by(Submission.date.desc()).all()
+        all_submissions = Submission.query.filter_by(group_id=selected_group_id).order_by(Submission.date.desc()).all()
     else:
-        all_submissions = Submission.query.order_by(Submission.date.desc()).all()
+        # Submissions from all groups under this lecturer's courses
+        all_submissions = Submission.query.filter(Submission.group_id.in_([g.id for g in groups])).order_by(Submission.date.desc()).all()
 
-    # Group submissions into chains
+    #  Group submissions into chains
     chains = defaultdict(list)
     for s in all_submissions:
         key = s.original_id if s.original_id else s.id
         chains[key].append(s)
 
-    # Final structure with answer lists
+    # Structure with latest and previous answers
     submissions_dict = {}
     for chain_submissions in chains.values():
         sorted_chain = sorted(chain_submissions, key=lambda x: x.date, reverse=True)
@@ -967,12 +975,13 @@ def history():
 
         latest_answers = SubmissionFieldAnswer.query.filter_by(submission_id=latest.id).all()
         previous_answers = (
-        SubmissionFieldAnswer.query
+            SubmissionFieldAnswer.query
             .filter_by(submission_id=previous.id)
-            .options(db.joinedload(SubmissionFieldAnswer.submission))  
+            .options(db.joinedload(SubmissionFieldAnswer.submission))
             .all()
             if previous else []
         )
+
         submissions_dict[latest] = {
             "latest_answers": latest_answers,
             "previous_answers": previous_answers
@@ -1090,7 +1099,8 @@ malaysia_time = pytz.timezone('Asia/Kuala_Lumpur')
 @app.route('/submit_edit/<int:submission_id>', methods=['POST'])
 def submit_edit(submission_id):
     old_submission = Submission.query.get_or_404(submission_id)
-    if old_submission.group_id != session.get('user_id'):
+    group_id = get_student_group_id(old_submission.course_id)
+    if int(old_submission.group_id) != int(group_id):
         abort(403)
 
     original_id = old_submission.original_id if old_submission.original_id else old_submission.id
