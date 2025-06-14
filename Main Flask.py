@@ -12,14 +12,10 @@ from datetime import datetime
 from collections import defaultdict
 from sqlalchemy import or_
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
-from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash
-
-serializer = URLSafeTimedSerializer(app.secret_key)
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'mydatabase.db')
-
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '#83yUi_a'
@@ -340,32 +336,6 @@ def signup():
             return redirect(url_for("signup"))
 
     return render_template("Signup.html") # This is the render template!!!!!!!!!!!!!!!!!!!!#
-
-# Forgot Password Route
-@app.route('/forgot_password', methods=['GET', 'POST'])
-def forgot_password():
-    if request.method == 'POST':
-        email = request.form.get('email')
-        user = Users.query.filter_by(email=email).first()
-        if user:
-            token = serializer.dumps(user.username, salt='password-reset-salt')
-            reset_link = url_for('reset_password', token=token, _external=True)
-
-            # --- For demo: print the link to console
-            print(f"Password reset link: {reset_link}")
-
-            msg = Message("Password Reset Request", recipients=[email])
-            msg.body = f"Click the link to reset your password: {reset_link}"
-            mail.send(msg)
-
-            flash("A password reset link has been sent to your email.")
-        else:
-            flash("Email not found.")
-
-        return redirect(url_for('login'))
-
-    return render_template('forgot_password.html')
-
 
 # Reset Password Route
 @app.route('/reset_password/<token>', methods=['GET', 'POST'])
