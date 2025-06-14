@@ -29,10 +29,6 @@
                     <p><strong>{{ answer.field.field_name }}:</strong> {{ answer.value }}</p>
                 {% endfor %}
 
-                {% if latest.filename %}
-                    <a href="{{ url_for('download', filename=latest.filename) }}" class="btn btn-link">Download File</a>
-                {% endif %}
-
                 {% if data.previous_answers %}
                     <button class="btn btn-secondary btn-sm mt-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePrevious{{ latest.id }}" aria-expanded="false" aria-controls="collapsePrevious{{ latest.id }}">
                         Show Previous Version
@@ -43,9 +39,6 @@
                             {% for answer in data.previous_answers %}
                                 <p><strong>{{ answer.field.field_name }}:</strong> {{ answer.value }}</p>
                             {% endfor %}
-                            {% if data.previous_answers[0].submission.filename %}
-                                <a href="{{ url_for('download', filename=data.previous_answers[0].submission.filename) }}" class="btn btn-link">Download File</a>
-                            {% endif %}
                         </div>
                     </div>
                 {% endif %}
