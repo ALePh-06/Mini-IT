@@ -1,5 +1,4 @@
 import sqlite3
-# Added render template and more
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.exceptions import abort
@@ -13,6 +12,8 @@ from collections import defaultdict
 from sqlalchemy import or_
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from werkzeug.security import generate_password_hash
+from collections import defaultdict
+from sqlalchemy.orm import joinedload
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'mydatabase.db')
@@ -135,6 +136,8 @@ class Submission(db.Model):
     values = db.relationship('SubmissionFieldAnswer', backref='submission', cascade="all, delete-orphan")
     
     course = db.relationship('Course', backref='submissions')
+    group = db.relationship('Group', backref='submissions', primaryjoin="Submission.group_id == foreign(Group.group_code)", uselist=False)
+
 
     edits = db.relationship(
         "Submission",
@@ -908,6 +911,7 @@ def edit_submission(submission_id):
     )
 
 # Route for submission history lecturer
+
 @app.route('/SubmissionHistory')
 def history():
     user_type = session.get('user_type')
@@ -926,66 +930,60 @@ def history():
         flash("User not found.")
         return redirect(url_for('login'))
 
-    # Lecturer's courses
+    # Fetch courses created by lecturer
     lecturer_courses = Course.query.filter_by(lecturer_id=user.id).all()
-    print(" Lecturer ID:", user.id)
-    print(" Courses for this lecturer:")
-    for course in lecturer_courses:
-        print(f"- {course.id}: {course.title}")
-    course_ids = [c.id for c in lecturer_courses]
+    course_ids = [course.id for course in lecturer_courses]
 
-    # Get course filter
     selected_course_id = request.args.get('course_id', type=int)
 
-    # Filter groups and submissions by course
+    # Determine group IDs based on course filter
     if selected_course_id:
         groups = Group.query.filter_by(course_id=selected_course_id).all()
-        group_ids = [g.id for g in groups]
-        submissions = Submission.query.filter(
-            Submission.group_id.in_(group_ids),
-            Submission.course_id == selected_course_id
-        ).order_by(Submission.date.desc()).all()
     else:
         groups = Group.query.filter(Group.course_id.in_(course_ids)).all()
-        group_ids = [g.id for g in groups]
-        submissions = Submission.query.filter(
-            Submission.group_id.in_(group_ids)
-        ).order_by(Submission.date.desc()).all()
 
-    # Group submissions into chains
-    from collections import defaultdict
+    group_ids = [g.id for g in groups]
+
+    # Get all submissions from those groups
+    submissions = Submission.query \
+        .filter(Submission.group_id.in_(group_ids)) \
+        .order_by(Submission.date.desc()) \
+        .options(joinedload(Submission.group), joinedload(Submission.course)) \
+        .all()
+
+    # Chain versions of submissions
     chains = defaultdict(list)
     for s in submissions:
         key = s.original_id if s.original_id else s.id
         chains[key].append(s)
 
-    # Build submission dict
-    submissions_dict = {}
-    for chain_submissions in chains.values():
-        sorted_chain = sorted(chain_submissions, key=lambda x: x.date, reverse=True)
-        latest = sorted_chain[0]
-        previous = sorted_chain[1] if len(sorted_chain) > 1 else None
+    # Build submission chain dict
+    if submissions:
+        submissions_dict = {}
+        for chain in chains.values():
+            sorted_chain = sorted(chain, key=lambda x: x.date, reverse=True)
+            latest = sorted_chain[0]
+            previous = sorted_chain[1] if len(sorted_chain) > 1 else None
 
-        latest_answers = SubmissionFieldAnswer.query.filter_by(submission_id=latest.id).all()
-        previous_answers = (
-            SubmissionFieldAnswer.query
-            .filter_by(submission_id=previous.id)
-            .options(db.joinedload(SubmissionFieldAnswer.submission))
-            .all()
-            if previous else []
-        )
+            latest_answers = SubmissionFieldAnswer.query.filter_by(submission_id=latest.id).all()
+            previous_answers = []
+            if previous:
+                previous_answers = SubmissionFieldAnswer.query \
+                    .filter_by(submission_id=previous.id) \
+                    .options(joinedload(SubmissionFieldAnswer.submission)) \
+                    .all()
 
-        submissions_dict[latest] = {
-            "latest_answers": latest_answers,
-            "previous_answers": previous_answers
-        }
+            submissions_dict[latest] = {
+                "latest_answers": latest_answers,
+                "previous_answers": previous_answers
+            }
 
     return render_template(
         'SubmissionHistory.html',
         submissions=submissions_dict,
         courses=lecturer_courses,
         selected_course_id=selected_course_id
-    )
+        )
 
 # Route to view a specific submission for lecturers 
 @app.route('/viewsubmission/<int:submission_id>')
