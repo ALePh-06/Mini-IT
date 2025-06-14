@@ -389,12 +389,11 @@ def JoinCourse():
         db.session.add(join)
         db.session.commit()
         flash(f"You've successfully joined {course.title}.")
-<<<<<<< HEAD
-        return redirect(url_for('JoinCourse'), course_id=course.id) # Change the join_group to JoinCourse atm
+        return redirect(url_for('index'))
 
     return render_template('JoinCourse.html')
 
-'''@app.route('/course/<int:course_id>/join_group', methods=['GET', 'POST'])
+@app.route('/course/<int:course_id>/join_group', methods=['GET', 'POST'])
 def join_group(course_id):
     user = get_current_user()
     course = Course.query.get_or_404(course_id)
@@ -430,14 +429,8 @@ def join_group(course_id):
         flash(f"Group '{group_name}' created and you have been added.")
         return redirect(url_for('view_course_s', course_id=course.id))
 
-    return render_template("GroupJoining.html", course=course)'''
+    return render_template("GroupJoining.html", course=course)
 
-=======
-        return redirect(url_for('index'))
-
-    return render_template('JoinCourse.html')
-
->>>>>>> main
 @app.route('/course/<int:course_id>/access')
 def access_course(course_id):
     if 'user_type' not in session or session['user_type'] != 'student':
@@ -603,12 +596,6 @@ def index():
 
 @app.route('/course/<int:course_id>', methods=['GET', 'POST'])
 def view_course(course_id):
-<<<<<<< HEAD
-    course = get_course(course_id)
-    assigned_template = AssignedTemplate.query.filter_by(course_id=course_id).first()
-    user = get_current_user()
-    group =  db.session.query(Group.id).join(GroupMembers).filter(Group.course_id == course.id, GroupMembers.student_id == user.id)
-=======
 
     malaysia_tz = timezone('Asia/Kuala_Lumpur')
     course = get_course(course_id)
@@ -628,7 +615,6 @@ def view_course(course_id):
         .options(db.joinedload(Group.members).joinedload(GroupMembers.student))
         .all()
     )
->>>>>>> main
 
     if session['user_type'] == 'lecturer':
         return render_template('view_course.html', course=course, assigned_template=assigned_template.id if assigned_template else None)  # Create this template
