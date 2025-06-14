@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Assign Groups for {{ course.title }}</h2>
+
+    <form method="POST" class="needs-validation" novalidate>
+        <div class="form-group mb-3">
+            <label for="num_groups">Number of Groups</label>
+            <input type="number" class="form-control" id="num_groups" name="num_groups" min="1" required>
+        </div>
+
+        <div class="form-group mb-4">
+            <label for="deadline">Deadline to Leave Group</label>
+            <input type="datetime-local" class="form-control" id="deadline" name="deadline" required>
+        </div>
+
+        <button type="submit" class="btn btn-success">Create Groups</button>
+    </form>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="alert alert-info mt-4">
+                {% for message in messages %}
+                    <div>{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+</div>
+{% endblock %}

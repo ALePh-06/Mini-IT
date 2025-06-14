@@ -1,0 +1,47 @@
+{% extends 'base_s.html' %}
+
+{% block content %}
+<h3>Select a Group for {{ course.title }}</h3>
+<div class="row">
+    {% for g in groups %}
+        <div class="col-md-4">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <strong>{{ g.name }}</strong>
+                </div>
+                <div class="card-body">
+                    <p>Members ({{ g.members|length }}/4)</p>
+                    <ul class="list-unstyled">
+                        {% for m in g.members %}
+                            <li>{{ m.student.username }}</li>
+                        {% endfor %}
+                    </ul>
+
+                    {% if group and group.id == g.id %}
+                        {% if malaysia_now < g.deadline %}
+                            <form method="POST" action="{{ url_for('leave_group', course_id=course.id) }}">
+                                <input type="hidden" name="group_id" value="{{ g.id }}">
+                                <input type="hidden" name="action" value="leave">
+                                <button class="btn btn-danger btn-sm">Leave Group</button>
+                            </form>
+                        {% else %}
+                            <div class="text-muted">Cannot leave (deadline passed)</div>
+                        {% endif %}
+                    {% elif not group and g.members|length < 4 %}
+                        <form method="POST" action="{{ url_for('join_group', course_id=course.id) }}">
+                            <input type="hidden" name="group_id" value="{{ g.id }}">
+                            <input type="hidden" name="action" value="join">
+                            <button class="btn btn-primary btn-sm">Join Group</button>
+                        </form>
+                    {% elif not group and g.members|length >= 4 %}
+                        <div class="text-muted">Group full</div>
+                    {% endif %}
+                </div>
+                <div class="card-footer text-muted">
+                    Deadline: {{ g.deadline.strftime('%Y-%m-%d %H:%M') }}
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
