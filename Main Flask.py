@@ -136,8 +136,7 @@ class Submission(db.Model):
     values = db.relationship('SubmissionFieldAnswer', backref='submission', cascade="all, delete-orphan")
     
     course = db.relationship('Course', backref='submissions')
-    group = db.relationship('Group', backref='submissions', primaryjoin="Submission.group_id == foreign(Group.group_code)", uselist=False)
-
+    group = db.relationship('Group', primaryjoin="Submission.group_id == foreign(Group.group_code)", uselist=False, viewonly = True)
 
     edits = db.relationship(
         "Submission",
@@ -264,6 +263,10 @@ def require_login():
     allowed_routes = ['login', 'signup', 'static']
     if request.endpoint not in allowed_routes and 'username' not in session:
         return redirect(url_for('login'))
+    
+@app.route('/About')
+def about():
+    return render_template("about.html")
 
 @app.route('/Login', methods=["GET", "POST"])
 def login():
@@ -883,16 +886,23 @@ def edit_submission(submission_id):
     if not user_id:
         abort(403)
 
-    #  New logic: use clean student mapping
-    student_map = StudentMap.query.filter_by(user_id=user_id).first()
+    # Get all group codes the student is a member of
+    student_groups = (
+        db.session.query(Group.group_code)
+        .join(GroupMembers, Group.id == GroupMembers.group_id)
+        .filter(GroupMembers.student_id == user_id)
+        .all()
+    )
+    group_codes = [code for (code,) in student_groups]  # unpack tuples
 
-    if not student_map:
-        abort(403, "Student not mapped to a group.")
+    if not group_codes:
+        abort(403, "You are not a member of any group.")
 
-    if str(submission.group_id) != str(student_map.group_id):
+    # submission.group_id is a group_code (string), so compare to group_codes
+    if submission.group_id not in group_codes:
         abort(403, "You cannot edit another group's submission.")
 
-    print(" Access granted — user belongs to correct group.")
+    print("Access granted — user belongs to a valid group.")
 
     template = Template.query.get(submission.template_id)
     fields = TemplateField.query.filter_by(template_id=template.id).all()
@@ -909,6 +919,7 @@ def edit_submission(submission_id):
         fields=fields,
         answers=answers,
     )
+
 
 # Route for submission history lecturer
 @app.route('/SubmissionHistory')
@@ -1006,11 +1017,12 @@ def view_submission(submission_id):
 # Route for submission status
 @app.route('/Status')
 def status():
-    current_user = Users.query.filter_by(username=session["username"]).first()
+    user = get_current_user()
+
 
     if session['user_type'] == 'lecturer':
         # Get all courses taught by the lecturer
-        courses = Course.query.filter_by(lecturer_id=current_user.id).all()
+        courses = Course.query.filter_by(lecturer_id=user.id).all()
         course_ids = [course.id for course in courses]
 
         # Get selected course_id from dropdown (if any)
@@ -1035,18 +1047,25 @@ def status():
 
     else:
         # Student view
-        group_id = session.get("user_id")
-        all_submissions = Submission.query.filter_by(group_id=group_id).order_by(Submission.date.desc()).all()
+        group_memberships = db.session.query(Group).join(GroupMembers).filter(
+        GroupMembers.student_id == user.id
+        ).all()
 
-        # Group into chains
-        chains = defaultdict(list)
-        for s in all_submissions:
-            key = s.original_id if s.original_id else s.id
-            chains[key].append(s)
+    all_submissions = []
 
-        latest_submissions = [sorted(subs, key=lambda x: x.date, reverse=True)[0] for subs in chains.values()]
+    for group in group_memberships:
+        submissions = Submission.query.filter_by(group_id=group.group_code).order_by(Submission.date.desc()).all()
+        all_submissions.extend(submissions)
 
-        return render_template("status_s.html", submissions=latest_submissions)
+    # Group into chains
+    chains = defaultdict(list)
+    for s in all_submissions:
+        key = s.original_id if s.original_id else s.id
+        chains[key].append(s)
+
+    latest_submissions = [sorted(subs, key=lambda x: x.date, reverse=True)[0] for subs in chains.values()]
+
+    return render_template("status_s.html", submissions=latest_submissions)
     
 # Route for updating both status and adding comment
 @app.route("/update_status/<int:submission_id>", methods=["POST"])
@@ -1092,15 +1111,6 @@ def submit_edit(submission_id):
     user_id = session.get('user_id')
     if not user_id:
         abort(403)
-
-    # Use StudentMap instead of get_student_group_id
-    student_map = StudentMap.query.filter_by(user_id=user_id).first()
-    if not student_map:
-        abort(403, "Student not mapped to a group.")
-
-    if str(old_submission.group_id) != str(student_map.group_id):
-        abort(403, "You cannot edit another group's submission.")
-
     #  Determine the original submission ID
     original_id = old_submission.original_id if old_submission.original_id else old_submission.id
 
@@ -1146,31 +1156,33 @@ def delete_submission(submission_id):
     # Get the submission
     submission = Submission.query.get_or_404(submission_id)
 
-    #  Get the student's group from StudentMap
-    student_map = StudentMap.query.filter_by(user_id=user_id).first()
-    if not student_map:
-        abort(403, "Student not mapped to a group.")
+    # Check student group membership
+    student_groups = GroupMembers.query.filter_by(student_id=user_id).all()
+    group_ids = [g.group_id for g in student_groups]
+    group_codes = [g.group.group_code for g in student_groups if g.group]
 
-    #  Check ownership
-    if int(submission.group_id) != int(student_map.group_id):
+    if submission.group_id not in group_codes:
         abort(403, "You cannot delete another group's submission.")
 
-    #  Find the original submission
+    # Find original submission
     original = Submission.query.get(submission.original_id) if submission.original_id else submission
 
-    #  Get all versions (original + edits)
+    # Get all versions (original + edits)
     edits = Submission.query.filter_by(original_id=original.id).all()
     all_to_delete = edits + [original]
 
-    #  Avoid double loops — delete comments & submissions together
+    # Delete associated comments and submission field answers
     for sub in all_to_delete:
         for comment in sub.comments:
             db.session.delete(comment)
+        for field_answer in sub.values:
+            db.session.delete(field_answer)
         db.session.delete(sub)
 
     db.session.commit()
     flash("Submission and all edits deleted successfully.", "info")
     return redirect(url_for('student_history'))
+
 
 
 
