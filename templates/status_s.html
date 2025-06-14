@@ -11,6 +11,9 @@
             <h5 class="card-title mb-2">
               {{ submission.group_id if submission.group_id else "Untitled Submission" }}
             </h5>
+            <h6 class="card-subtitle mb-2 text-muted">
+              Course: {{ submission.course.title if submission.course else 'Unknown' }}
+            </h6>
           </a>
           <span class="badge badge-primary">Status: {{ submission.status or "Pending" }}</span>
         </div>
