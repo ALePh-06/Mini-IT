@@ -476,10 +476,10 @@ def index():
 
 @app.route('/course/<int:course_id>', methods=['GET', 'POST'])
 def view_course(course_id):
-    course = get_course(course_id).id
+    course = get_course(course_id)
     assigned_template = AssignedTemplate.query.filter_by(course_id=course_id).first()
     user = get_current_user()
-    group =  db.session.query(Group.id).join(GroupMembers).filter(Group.course_id == course, GroupMembers.student_id == user.id)
+    group =  db.session.query(Group.id).join(GroupMembers).filter(Group.course_id == course.id, GroupMembers.student_id == user.id)
 
     if session['user_type'] == 'lecturer':
         return render_template('view_course.html', course=course, assigned_template=assigned_template)  # Create this template
