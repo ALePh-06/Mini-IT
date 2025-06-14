@@ -5,6 +5,8 @@
 {% block content %}
 <div class="container mt-4">
     <h1 class="mb-4">Submission Details</h1>
+    <h3>Group: {{ submission.group_id }}</h3>
+    <h3>Course: {{ submission.course.title if submission.course else "Unknown Course" }}</h3>
 
     {% if answers %}
         {% for answer in answers %}
