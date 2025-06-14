@@ -401,18 +401,20 @@ def access_course(course_id):
 
     user = get_current_user()
     course = Course.query.get_or_404(course_id)
-
-    # Ensure student is enrolled
-    enrolled = StudentCourse.query.filter_by(course_id=course.id, student_id=user.id).first()
-    if not enrolled:
-        flash("You are not enrolled in this course.")
-        return redirect(url_for('index'))
+    groups = (
+        db.session.query(Group)
+        .filter_by(course_id=course_id)
+        .options(db.joinedload(Group.members).joinedload(GroupMembers.student))
+        .all()
+    )
+    user = get_current_user()
+    malaysia_now = datetime.now(pytz.timezone('Asia/Kuala_Lumpur'))
 
     # Ensure student has joined a group
     if not user.group_id:
         return redirect(url_for('join_group', course_id=course.id))
 
-    return redirect(url_for('view_course_s', course_id=course.id))
+    return render_template('select_group.html', course=course, groups=groups, malaysia_now=malaysia_now)
 
 # Lecturer Group Assignment
 @app.route('/course/<int:course_id>/assign_groups', methods=['GET', 'POST'])
@@ -579,7 +581,7 @@ def view_course(course_id):
     )
 
     if session['user_type'] == 'lecturer':
-        return render_template('view_course.html', course=course, assigned_template=assigned_template.id if assigned_template else None)  # Create this template
+        return render_template('view_course.html', course=course, assigned_template=assigned_template if assigned_template else None)  # Create this template
     else:
         # Check enrollment
         enrolled = StudentCourse.query.filter_by(course_id=course.id, student_id=user.id).first()
