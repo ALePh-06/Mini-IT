@@ -12,13 +12,10 @@ from datetime import datetime
 from collections import defaultdict
 from sqlalchemy import or_
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
-from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash
-from itsdangerous import URLSafeTimedSerializer
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'mydatabase.db')
-
 
 app = Flask(__name__)
 
@@ -340,61 +337,6 @@ def signup():
             return redirect(url_for("signup"))
 
     return render_template("Signup.html") # This is the render template!!!!!!!!!!!!!!!!!!!!#
-
-# Forgot Password Route
-@app.route('/forgot_password', methods=['GET', 'POST'])
-def forgot_password():
-    if request.method == 'POST':
-        email = request.form.get('email')
-        user = Users.query.filter_by(email=email).first()
-        if user:
-            token = serializer.dumps(user.username, salt='password-reset-salt')
-            reset_link = url_for('reset_password', token=token, _external=True)
-
-            # --- For demo: print the link to console
-            print(f"Password reset link: {reset_link}")
-
-            msg = Message("Password Reset Request", recipients=[email])
-            msg.body = f"Click the link to reset your password: {reset_link}"
-
-            flash("A password reset link has been sent to your email.")
-        else:
-            flash("Email not found.")
-
-        return redirect(url_for('login'))
-
-    return render_template('forgot_password.html')
-
-
-# Reset Password Route
-@app.route('/reset_password/<token>', methods=['GET', 'POST'])
-def reset_password(token):
-    try:
-        username = serializer.loads(token, salt='password-reset-salt', max_age=3600)  # 1 hour validity
-    except SignatureExpired:
-        flash("The password reset link has expired.")
-        return redirect(url_for('forgot_password'))
-    except BadSignature:
-        flash("Invalid or tampered link.")
-        return redirect(url_for('forgot_password'))
-
-    user = Users.query.filter_by(username=username).first_or_404()
-
-    if request.method == 'POST':
-        new_password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
-
-        if not new_password or not confirm_password:
-            flash("Please fill in all fields.")
-        elif new_password != confirm_password:
-            flash("Passwords do not match.")
-        else:
-            user.password = generate_password_hash(new_password)
-            db.session.commit()
-            flash("Your password has been reset successfully. Please log in.")
-            return redirect(url_for('login'))
-
-    return render_template('reset_password.html')
 
 
 # Join course via code function
@@ -944,7 +886,7 @@ def edit_submission(submission_id):
     if not student_map:
         abort(403, "Student not mapped to a group.")
 
-    if int(submission.group_id) != int(student_map.group_id):
+    if str(submission.group_id) != str(student_map.group_id):
         abort(403, "You cannot edit another group's submission.")
 
     print(" Access granted — user belongs to correct group.")
@@ -1099,21 +1041,23 @@ def status():
 
     else:
         # Student view
-        group = db.session.query(Group).join(GroupMembers).filter(GroupMembers.student_id == user.id).all()
-        group_id = group.group_code
-        all_submissions = Submission.query.filter_by(group_id=group_id).order_by(Submission.date.desc()).all()
+        groups = db.session.query(Group).join(GroupMembers).filter(GroupMembers.student_id == user.id).all()
+        group_ids = [g.group_code for g in groups]
 
-        # Group submissions into chains
+    if group_ids:
+        all_submissions = Submission.query.filter(Submission.group_id.in_(group_ids)).order_by(Submission.date.desc()).all()
+
         chains = defaultdict(list)
         for s in all_submissions:
             key = s.original_id if s.original_id else s.id
             chains[key].append(s)
 
-        # Get the latest version of each chain
         latest_submissions = [sorted(subs, key=lambda x: x.date, reverse=True)[0] for subs in chains.values()]
-
         return render_template("status_s.html", submissions=latest_submissions)
-
+    else:
+        flash("You are not part of any group.", "warning")
+        return redirect(url_for('index'))
+    
 # Route for updating both status and adding comment
 @app.route("/update_status/<int:submission_id>", methods=["POST"])
 def update_status_and_comment(submission_id):
@@ -1164,7 +1108,7 @@ def submit_edit(submission_id):
     if not student_map:
         abort(403, "Student not mapped to a group.")
 
-    if int(old_submission.group_id) != int(student_map.group_id):
+    if str(old_submission.group_id) != str(student_map.group_id):
         abort(403, "You cannot edit another group's submission.")
 
     #  Determine the original submission ID
