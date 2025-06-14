@@ -1,5 +1,4 @@
 import sqlite3
-# Added render template and more
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.exceptions import abort
@@ -13,6 +12,8 @@ from collections import defaultdict
 from sqlalchemy import or_
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from werkzeug.security import generate_password_hash
+from collections import defaultdict
+from sqlalchemy.orm import joinedload
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'mydatabase.db')
@@ -135,6 +136,8 @@ class Submission(db.Model):
     values = db.relationship('SubmissionFieldAnswer', backref='submission', cascade="all, delete-orphan")
     
     course = db.relationship('Course', backref='submissions')
+    group = db.relationship('Group', backref='submissions', primaryjoin="Submission.group_id == foreign(Group.group_code)", uselist=False)
+
 
     edits = db.relationship(
         "Submission",
@@ -953,17 +956,18 @@ def history():
         previous = sorted_chain[1] if len(sorted_chain) > 1 else None
 
         latest_answers = SubmissionFieldAnswer.query.filter_by(submission_id=latest.id).all()
-        previous_answers = (
-            SubmissionFieldAnswer.query
-            .filter_by(submission_id=previous.id)
-            .options(db.joinedload(SubmissionFieldAnswer.submission))
-            .all()
-            if previous else []
-        )
 
+        previous_answers = []
+        if previous:
+            previous_answers = SubmissionFieldAnswer.query \
+            .filter_by(submission_id=previous.id) \
+            .options(joinedload(SubmissionFieldAnswer.submission)) \
+            .all()
+
+        # Always include the latest submission, even if no previous version exists
         submissions_dict[latest] = {
-            "latest_answers": latest_answers,
-            "previous_answers": previous_answers
+        "latest_answers": latest_answers,
+        "previous_answers": previous_answers
         }
 
     return render_template(
@@ -971,7 +975,7 @@ def history():
         submissions=submissions_dict,
         courses=lecturer_courses,
         selected_course_id=selected_course_id
-    )
+        )
 
 # Route to view a specific submission for lecturers 
 @app.route('/viewsubmission/<int:submission_id>')

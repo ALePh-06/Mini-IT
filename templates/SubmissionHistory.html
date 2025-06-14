@@ -16,35 +16,38 @@
         {% endfor %}
     </select>
 </form>
-
+    {% if submissions %}
     <!--  SUBMISSION CARDS -->
-    {% for latest, data in submissions.items() %}
-        <div class="card mb-3">
-            <div class="card-body">
-                <h4 class="card-title">Group: {{ latest.group_id }}</h4>
-                <h4 class="card-title">Course: {{ latest.course.title if latest.course else 'Unknown' }}</h4>
-                <p><strong>Submitted At:</strong> {{ latest.date.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+        {% for latest, data in submissions.items() %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h4 class="card-title">Group: {{ latest.group_id }}</h4>
+                    <h4 class="card-title">Course: {{ latest.course.title if latest.course else 'Unknown' }}</h4>
+                    <p><strong>Submitted At:</strong> {{ latest.date.strftime('%Y-%m-%d %H:%M:%S') }}</p>
 
-                {% for answer in data.latest_answers %}
-                    <p><strong>{{ answer.field.field_name }}:</strong> {{ answer.value }}</p>
-                {% endfor %}
+                    {% for answer in data.latest_answers %}
+                        <p><strong>{{ answer.field.field_name }}:</strong> {{ answer.value }}</p>
+                    {% endfor %}
 
-                {% if data.previous_answers %}
-                    <button class="btn btn-secondary btn-sm mt-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePrevious{{ latest.id }}" aria-expanded="false" aria-controls="collapsePrevious{{ latest.id }}">
-                        Show Previous Version
-                    </button>
-                    <div class="collapse mt-2" id="collapsePrevious{{ latest.id }}">
-                        <div class="card card-body">
-                            <h6>Previous Version</h6>
-                            {% for answer in data.previous_answers %}
-                                <p><strong>{{ answer.field.field_name }}:</strong> {{ answer.value }}</p>
-                            {% endfor %}
+                    {% if data.previous_answers %}
+                        <button class="btn btn-secondary btn-sm mt-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePrevious{{ latest.id }}" aria-expanded="false" aria-controls="collapsePrevious{{ latest.id }}">
+                            Show Previous Version
+                        </button>
+                        <div class="collapse mt-2" id="collapsePrevious{{ latest.id }}">
+                            <div class="card card-body">
+                                <h6>Previous Version</h6>
+                                {% for answer in data.previous_answers %}
+                                    <p><strong>{{ answer.field.field_name }}:</strong> {{ answer.value }}</p>
+                                {% endfor %}
+                            </div>  
                         </div>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    {% endfor %}
+                    {% endif %}
+                </div>  
+            </div>  
+        {% endfor %}
+    {% else %}
+    <p class="text-muted">No submissions found for the selected course.</p>
+    {% endif %}
 </div>
 
 
