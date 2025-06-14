@@ -581,7 +581,7 @@ def view_course(course_id):
     )
 
     if session['user_type'] == 'lecturer':
-        return render_template('view_course.html', course=course, assigned_template=assigned_template.id if assigned_template else None)  # Create this template
+        return render_template('view_course.html', course=course, assigned_template=assigned_template if assigned_template else None)  # Create this template
     else:
         # Check enrollment
         enrolled = StudentCourse.query.filter_by(course_id=course.id, student_id=user.id).first()
