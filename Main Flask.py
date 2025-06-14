@@ -983,8 +983,8 @@ def history():
 
     # Lecturer's courses
     lecturer_courses = Course.query.filter_by(lecturer_id=user.id).all()
-    print("📘 Lecturer ID:", user.id)
-    print("📘 Courses for this lecturer:")
+    print(" Lecturer ID:", user.id)
+    print(" Courses for this lecturer:")
     for course in lecturer_courses:
         print(f"- {course.id}: {course.title}")
     course_ids = [c.id for c in lecturer_courses]
@@ -1129,7 +1129,7 @@ def update_status_and_comment(submission_id):
     if comment_text:
         current_user = Users.query.filter_by(username=session["username"]).first()
 
-        # ✅ Always store comment on the original submission
+        #  Always store comment on the original submission
         original = Submission.query.get(submission.original_id) if submission.original_id else submission
 
         comment = Comment(
