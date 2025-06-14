@@ -933,7 +933,7 @@ def history():
     # Get selected course from dropdown
     selected_course_id = request.args.get('course_id', type=int)
 
-    # ✅ Filter submissions directly by course_id
+    #  Filter submissions directly by course_id
     if selected_course_id:
         submissions = Submission.query.filter_by(course_id=selected_course_id).order_by(Submission.date.desc()).all()
     else:
