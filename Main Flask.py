@@ -15,8 +15,6 @@ from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash
 
-serializer = URLSafeTimedSerializer(app.secret_key)
-
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'mydatabase.db')
 
@@ -356,7 +354,6 @@ def forgot_password():
 
             msg = Message("Password Reset Request", recipients=[email])
             msg.body = f"Click the link to reset your password: {reset_link}"
-            mail.send(msg)
 
             flash("A password reset link has been sent to your email.")
         else:
